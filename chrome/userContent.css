@@ -1,0 +1,80 @@
+/* Thunderbird Dark — in-content documents (message body, compose).
+   Populated in Step 5.5 (reading pane) — plan §5.5.
+
+   #messagepane (aboutMessage.xhtml) is a type="content" <browser>, a genuinely
+   separate, unprivileged document per message — this is why it needs
+   userContent.css rather than userChrome.css (see reading-pane.css's header
+   comment for the chrome-vs-content split in the reading pane overall).
+
+   No !important and no forced background here, deliberately: the message
+   body is arbitrary HTML/plain-text from a real sender, which may carry its
+   own inline styles or a full embedded stylesheet (newsletters, marketing
+   mail, HTML signatures). These rules are a baseline for plain-text/minimal
+   messages, meant to be overridden by the message's own styling wherever it
+   exists — forcing colors with !important here would fight legitimately
+   styled mail (e.g. inverting a sender's own light-mode HTML layout) rather
+   than just improving the default. TB's own per-message "dark reader" toggle
+   (#disableDarkReader in aboutMessage.xhtml) already exists for messages that
+   need more aggressive recoloring; that's out of this theme's scope.
+
+   Not yet scoped with @-moz-document url-prefix() to the message-body
+   document specifically — verify the actual URL scheme via the Browser
+   Toolbox on #messagepane's content document before assuming this is safe
+   to leave unscoped (risk: bleeding into other in-content pages TB may load
+   through a content-type browser, e.g. account setup/compose).
+
+   Regression found via 04_reading_pane_09/10.png: forcing `color:
+   var(--text-second)` without also forcing a dark background turned plain
+   messages' default-black text into light-gray *on their own white/default
+   background* — worse contrast than doing nothing, not better. The two
+   properties only make sense together (README's 14px/1.72/#c9cbd1 spec
+   assumes the dark --bg-reading backdrop), and forcing a background here
+   risks breaking mail that relies on a white background behind its own
+   colored logo/table content (e.g. the mBank email tested with). Dropped
+   color entirely rather than compounding the risk by also forcing a
+   background — TB's own per-message "dark reader" toggle
+   (#disableDarkReader) is the real, existing mechanism for that, out of
+   this theme's scope.
+
+   font-family/-size/line-height are a different matter from color, though,
+   and safe to force regardless of the message's own background: they
+   change spacing/shape, not visibility, so there's no equivalent contrast
+   risk. Re-added per a follow-up "make text better for reading" request —
+   still no color here, just readability metrics on top of whatever color
+   the message (or its absence) ends up with. */
+
+@import "tokens.css";
+@import "modules/contacts.css";
+@import "modules/settings.css";
+
+/* max-width centering (margin-inline: auto) left a ~104px gutter on each
+   side for short plain-text messages (measured from 04_reading_pane_12.png)
+   — too much idle space per the user. Switched to a small fixed left
+   gutter instead of centering (first 32px, ~1/3 of the original; halved
+   again to 16px per follow-up feedback in 04_reading_pane_19.png) — max-width
+   still caps the line length on wide panes, it just no longer pushes
+   content away from the edge when it doesn't need the full width. */
+html, body {
+  max-width: 760px;
+  margin-inline-start: 16px;
+  margin-inline-end: auto;
+  font-family: var(--font-ui);
+  font-size: var(--fs-read);
+  line-height: var(--lh-read);
+}
+
+/* Was var(--accent) (#34d399) — confirmed via 04_reading_pane_21.png as
+   genuinely low-contrast against this email's actual white background
+   ("skontaktuj się z nami tutaj" link, hard to read). --accent is tuned for
+   --bg-reading, not for the arbitrary background a real message may have —
+   this was the same class of mistake as the body-color regression, just
+   for one property instead of the whole block. --link-ink is a darker
+   compromise: legible on white, still visibly green on dark. */
+a {
+  color: var(--link-ink);
+}
+
+/* strong/b previously forced var(--text-strong) (#f2f3f5, near-white) —
+   same contrast bug as the body color above: illegible on a message's own
+   white/default background. Left unset entirely (not even --link-ink)
+   since bold text has no equivalent "needs to stay green" requirement. */

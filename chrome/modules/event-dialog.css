@@ -1,0 +1,507 @@
+/* New Event / Edit Event dialog — plan §5.9, scope addition (no reference
+   mock exists in either .dc.html prototype; user asked for this to be
+   brought in line with the rest of the theme after seeing it unstyled).
+
+   Structural note, confirmed from source (calendar-event-dialog.xhtml /
+   calendar-item-iframe.xhtml), NOT yet live-verified:
+   - The outer window (calendar-event-dialog.xhtml) holds the native OS
+     titlebar (out of scope, can't be styled — window-manager chrome, not
+     TB DOM), the menubar (#event-menubar) and the toolbar (#event-toolbar).
+   - The form body (Calendar/Title/Location/.../tabs) is NOT in that
+     document — it's inserted at runtime as a plain <iframe id=
+     "calendar-item-panel-iframe"> pointing at a *separate* chrome://
+     document, calendar-item-iframe.xhtml. That iframe has no
+     type="content", so per the same reasoning as reading-pane's
+     about:message header, userChrome.css should reach into it — same as
+     the outer window. First restart+screenshot must confirm this; if the
+     form-grid/tab-strip rules below don't take, this assumption is wrong
+     and they need to move to userContent.css instead.
+   - #item-description (the Description tab's rich-text body) *is*
+     `type="content"` — a genuinely separate, unprivileged document, same
+     shape as the reading pane's #messagepane. Its own content therefore
+     belongs in userContent.css, not here, and per the reading-pane lesson
+     should not have color forced without checking against real content
+     first (this dialog edits existing/imported events too, e.g. a Zoom
+     invite's HTML description, not just blank new ones). Only its
+     surrounding chrome (the #FormatToolbar toolbox, NOT part of the
+     type="content" editor) is styled here. */
+
+/* ---- Menu bar ---- */
+/* #event-menubar alone wasn't enough — confirmed live (06_new_event_02.png):
+   the visible row background is painted by the outer <toolbar type="menubar">
+   wrapper (native toolbar styling), not the <menubar> itself, which stayed
+   transparent and let a lighter native gray show through, mismatching the
+   toolbar row right below it. Target both. */
+toolbar[type="menubar"],
+#event-menubar {
+  background-color: var(--bg-titlebar) !important;
+  color: var(--text-second) !important;
+}
+
+/* ---- Toolbar ---- */
+#event-toolbar {
+  background-color: var(--bg-titlebar) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+  gap: 10px !important;
+}
+
+/* Explicit spacing between buttons — confirmed live they were rendering
+   edge-to-edge (Invite Attendees touching Save and Close) despite the
+   toolbar's own gap; margin on each button is more reliable than relying
+   on the toolbar's flex gap alone against native toolbarbutton defaults.
+   Trimmed from 10px to 6px per follow-up feedback — Delete was crowding
+   the window's right edge (see the "Default window width" note below:
+   the window wasn't actually growing, so every extra px of button margin
+   was direct pressure against the edge). Safe to trim without eating into
+   the width fix, since that's now driven by body padding, not by how
+   wide the toolbar's own content happens to be. */
+#button-saveandclose,
+#button-attendees,
+#button-privacy,
+#button-url,
+#button-delete {
+  margin-inline-end: 6px !important;
+}
+
+/* Save and Close: accent-filled pill, same treatment as folder-pane's
+   #folderPaneWriteMessage ("New message") — needed font-weight:600 to
+   actually match its contrast (confirmed live: without it, this read as
+   visibly weaker than New message despite identical bg/text colors) and
+   the icon needs its own fill forced separately, since chrome:// toolbar
+   icons don't automatically inherit a button's `color` for their fill. */
+#button-saveandclose {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border-radius: var(--radius-md) !important;
+  min-block-size: 32px !important;
+  padding-inline: 12px !important;
+  font-weight: 600 !important;
+}
+
+#button-saveandclose:hover {
+  filter: brightness(1.08);
+}
+
+#button-saveandclose .toolbarbutton-icon {
+  fill: var(--accent-ink) !important;
+  -moz-context-properties: fill !important;
+}
+
+/* Invite Attendees / Privacy / Attach / Delete: all the same plain
+   muted icon+text treatment, no border on any of them — Invite Attendees
+   previously had an explicit outline that none of its siblings did
+   (inconsistent, confirmed live), removed so the only visual weight in
+   this toolbar is the Save and Close fill. */
+#button-attendees,
+#button-privacy,
+#button-url,
+#button-delete {
+  border: none !important;
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+  min-block-size: 32px !important;
+}
+
+#button-attendees:hover,
+#button-privacy:hover,
+#button-url:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Delete: red hover, matches reading-pane's #hdrTrashButton. */
+#button-delete:hover {
+  background-color: var(--danger) !important;
+  color: #fff !important;
+}
+
+/* Icon size/alignment: these four use native chrome:// icons (person,
+   lock, paperclip, trash), rendered at inconsistent native sizes
+   relative to each other (confirmed live) — unify to the same 15px used
+   for reading-pane's action-toolbar icons (archive/snooze/trash) so this
+   toolbar reads as the same family of control. */
+#button-attendees .toolbarbutton-icon,
+#button-privacy .toolbarbutton-icon,
+#button-url .toolbarbutton-icon,
+#button-delete .toolbarbutton-icon {
+  inline-size: 15px !important;
+  block-size: 15px !important;
+}
+
+/* Invite Attendees → swap to this repo's own contacts.svg, matching the
+   spaces rail's Address Book icon (#addressBookButton) exactly, per user
+   request. Delete → swap to trash.svg, matching reading-pane's
+   #hdrTrashButton exactly, same "Delete" concept as the message-view
+   delete button. Same mask-image + background-color:currentColor
+   mechanism as every other icon swap in this theme (-moz-context-properties
+   doesn't work on our file://-loaded SVGs — see spaces-rail.css/
+   reading-pane.css for the full writeup); list-style-image: none first to
+   blank out the native glyph these buttons paint by default. */
+#button-attendees,
+#button-delete {
+  list-style-image: none !important;
+}
+
+#button-attendees .toolbarbutton-icon,
+#button-delete .toolbarbutton-icon {
+  content: none !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  background-color: currentColor !important;
+}
+
+#button-attendees .toolbarbutton-icon {
+  mask-image: url("../icons/contacts.svg") !important;
+}
+
+#button-delete .toolbarbutton-icon {
+  mask-image: url("../icons/trash.svg") !important;
+}
+
+/* ---- Form grid (Calendar / Title / Location / Category / All day /
+   Start / End / Repeat / Reminder) ---- */
+/* First region in this theme with real text inputs/menulists — no exact
+   precedent elsewhere, establishing the pattern here for reuse across the
+   whole grid rather than one-off values per field. */
+#event-grid {
+  background-color: var(--bg-today) !important;
+}
+
+#event-grid th,
+#event-grid-startdate-label-box label,
+#event-grid label {
+  color: var(--text-muted) !important;
+  font-size: var(--fs-body) !important;
+}
+
+/* macOS-style fields: no left/right/top border, just a bottom hairline —
+   more compact and less boxy than a full 4-side border, per explicit user
+   request. Applies to both text inputs and dropdown/datetime controls so
+   the whole grid reads as one consistent field style. */
+#item-calendar,
+#item-title,
+#item-location,
+#item-categories,
+#event-starttime,
+#event-endtime,
+#item-repeat,
+#item-alarm {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#item-calendar:hover,
+#item-title:hover,
+#item-location:hover,
+#item-categories:hover,
+#event-starttime:hover,
+#event-endtime:hover,
+#item-repeat:hover,
+#item-alarm:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+#item-calendar:focus-within,
+#item-title:focus,
+#item-location:focus,
+#item-categories:focus-within,
+#event-starttime:focus-within,
+#event-endtime:focus-within,
+#item-repeat:focus-within,
+#item-alarm:focus-within {
+  border-block-end-color: var(--accent) !important;
+}
+
+#item-title {
+  font-weight: 500 !important;
+}
+
+/* Menulists (Calendar/Category/Repeat/Reminder) and the datetime pickers'
+   internal menulist render their text and dropdown-chevron as two shadow
+   parts, each with their own native background/border — the outer rule
+   above only reaches the host element, not these parts, so without this
+   the chevron still shows as a separate boxed-in square (confirmed live,
+   06_new_event_02.png). */
+#item-calendar::part(text-input),
+#item-categories::part(text-input),
+#item-repeat::part(text-input),
+#item-alarm::part(text-input) {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+#item-calendar::part(dropmarker),
+#item-categories::part(dropmarker),
+#item-repeat::part(dropmarker),
+#item-alarm::part(dropmarker) {
+  background-color: transparent !important;
+  border: none !important;
+  fill: var(--text-muted) !important;
+}
+
+/* The date/time pickers' internal menulists are still boxed-in on the
+   chevron side even with the ::part(text-input)/::part(dropmarker)
+   overrides above applied to them too (confirmed live, 06_new_event_05.png
+   — the first attempt at this rule was identical to the plain-menulist
+   one and had no effect here specifically). These are
+   <menulist is="menulist-editable" editable="true"> (confirmed from
+   datetimepickers.js: CalendarDatePicker/CalendarTimePicker both
+   construct `.datepicker-menulist`/`.timepicker-menulist` this way), a
+   different variant from the plain Calendar/Category/Repeat/Reminder
+   menulists above — toolkit's menulist.css shows this variant can also
+   carry a `native` attribute that switches its shadow root to
+   `appearance: auto` (real OS/GTK widget rendering, immune to
+   background-color overrides on its parts entirely) instead of the
+   custom `:host(:not([native]))` button-like styling non-native menulists
+   get. Source reading alone couldn't pin down with certainty which branch
+   is active here, so this covers every candidate surface at once — the
+   host element itself (appearance + background, in case the box is native
+   OS rendering or a :host-level background rather than a part-level one),
+   plus both possible shadow parts (text-input and label-box, since which
+   one is "active" depends on the editable attribute state per
+   shared/menulist.css). Still needs live confirmation. */
+#event-starttime menulist,
+#event-endtime menulist {
+  appearance: none !important;
+  background-color: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+#event-starttime menulist::part(text-input),
+#event-starttime menulist::part(label-box),
+#event-endtime menulist::part(text-input),
+#event-endtime menulist::part(label-box) {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+#event-starttime menulist::part(dropmarker),
+#event-endtime menulist::part(dropmarker) {
+  background-color: transparent !important;
+  border: none !important;
+  fill: var(--text-muted) !important;
+}
+
+/* All-day checkbox: same visual language as today-pane's task checkbox
+   (accent when checked) rather than the native OS checkbox look. */
+#event-all-day {
+  color: var(--text-second) !important;
+}
+
+/* ---- Dropdown popups (open state): Calendar/Category/Repeat/Reminder ---- */
+/* The closed-state fields were fixed already, but opening any of these
+   reveals a navy-blue popup background with a *blue* selected-row
+   highlight (confirmed live, 06_new_event_06.png) — clashing with the
+   theme's green accent everywhere else. Root cause: toolkit's menu.css
+   colors the active/hovered menuitem via the native system colors
+   -moz-menuhover/-moz-menuhovertext, and the popup's own background comes
+   from the same native panel chrome — neither has anything to do with our
+   tokens, so it renders whatever blue the OS/native panel theme supplies.
+   Scoped to this dialog's four dropdowns specifically (a bare
+   `menuitem[_moz-menuactive]` selector would recolor every menu/context
+   -menu in the entire app, since this file loads via userChrome.css
+   globally — much bigger than what was asked for here). */
+#item-calendar menupopup,
+#item-categories menupopup,
+#item-repeat menupopup,
+#item-alarm menupopup {
+  background-color: var(--surface-card) !important;
+  color: var(--text-primary) !important;
+}
+
+/* The rule above targets the menupopup host element, but the visible
+   background is actually painted on its own ::part(content) shadow part
+   (confirmed to exist from datetimepickers.css's
+   `.timepicker-menulist > menupopup::part(content) { --panel-padding: 3px; }`
+   rule) — background-color on the host alone didn't reach it, so the
+   navy-blue native panel background was still showing through underneath
+   (confirmed live, 06_new_event_07.png; the muted teal on the hovered row
+   was our green --accent-soft highlight blending over that still-blue
+   backdrop, not a partial fix). Same "host vs. shadow part" gap as the
+   menulist text-input/dropmarker fixes elsewhere in this file. */
+#item-calendar menupopup::part(content),
+#item-categories menupopup::part(content),
+#item-repeat menupopup::part(content),
+#item-alarm menupopup::part(content) {
+  background-color: var(--surface-card) !important;
+  color: var(--text-primary) !important;
+}
+
+#item-calendar menupopup menuitem[_moz-menuactive]:not([disabled]),
+#item-categories menupopup menuitem[_moz-menuactive]:not([disabled]),
+#item-repeat menupopup menuitem[_moz-menuactive]:not([disabled]),
+#item-alarm menupopup menuitem[_moz-menuactive]:not([disabled]) {
+  background-color: var(--accent-soft) !important;
+  color: var(--text-strong) !important;
+}
+
+/* Still navy after both rules above (confirmed live, 06_new_event_08_*.png —
+   pixel-sampled the popup interior at rgb(38,45,59) across the whole box,
+   not just an edge). Root cause, found by reading toolkit's popup.css
+   directly rather than guessing further: ::part(content)'s background is
+   `background: var(--panel-background-color)` (a shorthand, default value
+   `Menu` — a native system color, evidently a blue-tinted GTK panel color
+   on this machine), and its border is `border: 1px solid
+   var(--panel-border-color)` (default `ThreeDShadow`). Neither of those
+   two CUSTOM PROPERTIES was ever touched above — only the literal
+   `background-color`/`color` properties were, which don't stop
+   --panel-background-color itself from still resolving to the native
+   color for any other consumer (the date/time pickers' own internal
+   menupopup below reads the exact same variable). Overriding the
+   variables at the host, instead of fighting the shorthand with a
+   longhand, is what actually reaches ::part(content) — also covers
+   #event-starttime/#event-endtime's internal menulist popup, which is the
+   navy frame visible around the minimonth date-grid in
+   06_new_event_08_start.png/_end.png (the calendar-minimonth element
+   inside it has its own separately-neutral background already; only its
+   outer popup chrome was leaking navy). */
+#item-calendar menupopup,
+#item-categories menupopup,
+#item-repeat menupopup,
+#item-alarm menupopup,
+#event-starttime menupopup,
+#event-endtime menupopup {
+  --panel-background-color: var(--surface-card) !important;
+  --panel-border-color: var(--border-line) !important;
+}
+
+/* ---- Native accent-color leaks: --selected-item-color ----
+   The minimonth date-picker's selected-day highlight/border and the
+   Start/End "keep duration" chain-link button both render blue for the
+   same reason, confirmed by reading messenger/shared/variables.css and
+   calendar's minimonth.css/calendar-event-dialog.css directly:
+   --selected-item-color: var(--sidebar-highlight-background-color,
+   AccentColor) — --sidebar-highlight-background-color is never defined
+   anywhere in the app (grepped the full extracted skin, no hits), so this
+   always falls through to the OS AccentColor system color (KDE's blue on
+   this machine). minimonth.css keys --mmDaySelectedBackground/
+   -BorderColor and --mmHighlightBackground off this same variable, and
+   calendar-event-dialog.css has `#keepduration-button[keep="true"] {
+   fill: var(--selected-item-color); }` for the chain-lock icon between
+   the Start/End rows. One override at the root fixes every consumer at
+   once instead of chasing each widget. Scoped with :has() to just this
+   dialog's two documents (the outer calendar-event-dialog.xhtml window,
+   identified by #event-toolbar, and the calendar-item-iframe.xhtml form
+   body, identified by #event-grid) — a bare `:root` rule would leak into
+   the main window too, since this file loads globally via userChrome.css. */
+:root:has(#event-toolbar),
+:root:has(#event-grid) {
+  --selected-item-color: var(--accent) !important;
+  --selected-item-text-color: var(--accent-ink) !important;
+}
+
+/* Belt-and-braces: same fix directly on the one hardcoded consumer that
+   doesn't read the variable through a custom-property fallback chain at
+   all cost (calendar-event-dialog.css sets `fill` as a literal property
+   value, not a variable), in case something between :root and this button
+   re-declares --selected-item-color before it gets here. */
+#keepduration-button[keep="true"] {
+  fill: var(--accent) !important;
+}
+
+/* ---- Time picker popup grid ---- */
+/* The Start/End time dropdown opens a `timepicker-grids` widget (an
+   hour/minute grid, not a plain menu list) — its colors are fully
+   driven by CSS custom properties declared on the element itself
+   (datetimepickers.css), including a literal hardcoded
+   `--tbHighlightBackground: #0a84ff` (macOS system blue) for dark
+   themes — the exact same blue-vs-green mismatch as the dropdowns above,
+   coming from a completely different mechanism. Unlike most native-widget
+   fights in this theme, this one is fully reachable from plain CSS: no
+   ::part() piercing, no appearance hacks, just redeclaring the variables
+   the widget already reads from. */
+timepicker-grids {
+  --tpMainColor: var(--text-primary) !important;
+  --tpMainBackground: var(--surface-card) !important;
+  --tpBorderColor: var(--border-hair) !important;
+  --tpSubColor: var(--text-muted) !important;
+  --tpSubBackground: var(--bg-today) !important;
+  --tpFiveminColor: var(--text-muted) !important;
+  --tpFiveminBackground: var(--bg-today) !important;
+  --tpItemHoverColor: var(--text-primary) !important;
+  --tpItemHoverBackground: var(--surface-hover) !important;
+  --tbHighlightColor: var(--accent-ink) !important;
+  --tbHighlightBackground: var(--accent) !important;
+}
+
+/* ---- Tab strip (Description / Attachments / Attendees) ---- */
+/* Reuses the main window's tab-bar pattern (active = filled + accent
+   indicator, inactive = muted) rather than inventing a new tab style for
+   this one dialog. */
+#event-grid-tabs {
+  background-color: transparent !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#event-grid-tabs > tab {
+  color: var(--text-muted) !important;
+  background-color: transparent !important;
+}
+
+#event-grid-tabs > tab[selected="true"] {
+  color: var(--text-primary) !important;
+  border-block-end: 2px solid var(--accent) !important;
+}
+
+#event-grid-tabpanels {
+  background-color: var(--bg-today) !important;
+}
+
+/* ---- Rich-text toolbar (Description tab) ---- */
+/* Only the toolbox chrome — #item-description itself is type="content",
+   styled (cautiously) from userContent.css instead, see header comment. */
+#FormatToolbar {
+  background-color: var(--bg-today) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#FormatToolbar .formatting-button {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+#FormatToolbar .formatting-button:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ---- Bottom notify/counter checkboxes ---- */
+#notify-options {
+  background-color: var(--bg-today) !important;
+}
+
+#notify-attendees-checkbox,
+#undisclose-attendees-checkbox,
+#disallow-counter-checkbox {
+  color: var(--text-second) !important;
+}
+
+/* ---- Default window width: KNOWN LIMITATION, abandoned ---- */
+/* Two attempts to add +150px to the dialog's default width, neither
+   worked — both confirmed live, not just theorized:
+   1. `min-inline-size` on the <html> root — did nothing
+      (06_new_event_04.png: window size unchanged). Reasoned cause:
+      calendar-item-panel.js sets `body.style.width = "fit-content"`
+      inline immediately before measuring `body.scrollWidth` for the
+      window size; an intrinsic-sizing keyword on `body` doesn't inherit
+      a min-width floor from its `html` ancestor.
+   2. `padding-inline-end: 150px` on `body` directly (reasoning: padding
+      is unambiguously included in scrollWidth regardless of how `width`
+      resolves) — also confirmed not to produce a wider window; the user
+      reported the window shrank *along with* the button-spacing trim
+      instead, meaning the real sizing mechanism isn't as simple as
+      "body.scrollWidth + fixed padding" and isn't understood yet (maybe
+      a measurement-timing issue against when this stylesheet's rules
+      apply, maybe the window is re-measured against different content
+      after our padding, maybe something else entirely).
+   User decision: stop here, accept the default content-driven width
+   as-is. Don't restart from either attempt above without new
+   information — both are confirmed dead ends, not just unverified
+   theories. */

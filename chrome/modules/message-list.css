@@ -1,0 +1,186 @@
+/* Message list (cards view) — plan §5.4. Selectors verified against TB
+   153.0 source (about3Pane.xhtml, shared/threadCard.css, shared/tree-listbox.css,
+   shared/quickFilterBar.css).
+
+   Row/card mechanics: each message is <tr is="thread-card" class="card-layout">
+   (extends TreeViewTableRow), containing a `.card-container` div cloned from
+   `#threadPaneCardTemplate`. Row background/border for every state (idle,
+   hover, current, selected, unfocused) is driven by reassigning the
+   --tree-card-background-* / --tree-card-border-* custom properties on the <tr>
+   itself (tree-listbox.css) — .card-container just reads whatever those
+   resolve to, so we override the variables rather than fighting per-state
+   selectors directly, same pattern as folder-pane's --folder-color-*.
+
+   Known, unavoidable deviations from the design prototype (stock TB's cards
+   view template genuinely doesn't have the markup for these — logged in
+   README "Deviations"):
+   - No avatar element in the row template at all (would need the JS shim,
+     plan §7, to inject one deterministically per sender).
+   - No message-preview/snippet line in the row template.
+   - Tag chips (`<thread-card-tags>`) are a shadow-DOM custom element with no
+     exposed ::part() hooks — light-DOM CSS can't reshape them into pill
+     chips, only inherited custom properties (--tag-color, already driven by
+     the user's real configured tag colors) reach across the boundary. Left
+     as TB's small colored tag-icon dots rather than the prototype's chips. */
+
+#threadPane {
+  background-color: var(--bg-list) !important;
+}
+
+#threadPane > tree-view,
+#threadTree tbody {
+  background-color: var(--bg-list) !important;
+  color: var(--text-second) !important;
+}
+
+/* ---- Row / card states ---- */
+/* Idle card: no visible border/card outline, just blend into the list bg —
+   matches the prototype's borderless row look (hairline only appears via
+   hover/selected backgrounds, not a permanent card border). */
+/* Targeting :root, not [is="tree-view-table-body"]: the tbody lives inside
+   a shadow root (proof: the <slot name="placeholders"> sibling seen in the
+   live DOM), so a light-DOM selector can never match it directly — same
+   family of bug as the spaces-rail --spaces-icon-* saga, but this time the
+   selector doesn't even match rather than losing a cascade tie. Custom
+   properties still cross the shadow boundary via inheritance as long as
+   they're set on a light-DOM ancestor, which is exactly what TB's own
+   tree-listbox.css does for these same variables (also on :root). */
+:root {
+  --tree-card-background: transparent !important;
+  --tree-card-border: transparent !important;
+  --tree-card-border-hover: transparent !important;
+  --tree-card-border-focus: transparent !important;
+  --tree-card-border-selected: transparent !important;
+  --tree-card-border-selected-unfocused: transparent !important;
+  --tree-card-background-current: var(--row-hover) !important;
+  --tree-card-background-current-unfocused: var(--row-hover) !important;
+  --tree-card-background-selected: var(--accent-soft) !important;
+  --tree-card-background-selected-current: var(--accent-soft) !important;
+  --tree-card-background-selected-unfocused: var(--accent-soft) !important;
+  --tree-card-background-selected-current-unfocused: var(--accent-soft) !important;
+  --tree-card-background-selected-current-unfocused-hover: var(--accent-soft) !important;
+}
+
+#threadTree .card-layout > td > .card-container {
+  border-radius: var(--radius-md) !important;
+}
+
+/* Left accent bar on the selected row, matching folder-pane's convention. */
+#threadTree .card-layout.selected > td > .card-container {
+  position: relative;
+}
+
+#threadTree .card-layout.selected > td > .card-container::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -2px;
+  top: 6px;
+  bottom: 6px;
+  width: 2.5px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+}
+
+/* ---- Typography: unread vs read ---- */
+#threadTree .card-layout .sender {
+  color: var(--text-second);
+}
+
+#threadTree .card-layout .subject {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+#threadTree .card-layout .date {
+  color: var(--text-faint) !important;
+  font-size: 11px !important;
+  opacity: 1 !important;
+}
+
+#threadTree .card-layout[data-properties~="unread"] .sender {
+  color: var(--text-strong) !important;
+}
+
+#threadTree .card-layout[data-properties~="unread"] .subject {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+#threadTree .card-layout.selected .sender {
+  color: var(--text-strong) !important;
+  font-weight: 600 !important;
+}
+
+#threadTree .card-layout.selected .subject {
+  color: var(--text-primary) !important;
+}
+
+/* Unread dot: recolors TB's own built-in --icon-dot (chrome://-origin, so
+   -moz-context-properties applies normally here — this isn't a custom SVG
+   of ours, unlike the spaces-rail icons). */
+#threadTree .card-layout .read-status {
+  fill: transparent !important;
+  stroke: transparent !important;
+}
+
+#threadTree .card-layout[data-properties~="unread"] .read-status {
+  fill: color-mix(in srgb, var(--accent) 20%, transparent) !important;
+  stroke: var(--accent) !important;
+}
+
+/* ---- Header bar ---- */
+#threadPaneHeaderBar {
+  background-color: transparent !important;
+  border-color: var(--border-hair) !important;
+}
+
+#threadPaneFolderName {
+  color: var(--text-strong) !important;
+  font-weight: 700 !important;
+}
+
+.thread-pane-count-info {
+  color: var(--text-muted) !important;
+}
+
+#threadPaneQuickFilterButton,
+#threadPaneDisplayButton {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+#threadPaneQuickFilterButton:hover,
+#threadPaneDisplayButton:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+#threadPaneQuickFilterButton[aria-pressed="true"] {
+  background-color: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
+/* ---- Quick filter bar pills ---- */
+#quick-filter-bar {
+  background-color: var(--bg-list) !important;
+  border-color: var(--border-hair) !important;
+}
+
+#quick-filter-bar .check-button {
+  border-radius: var(--radius-pill) !important;
+  color: var(--text-muted) !important;
+  background-color: var(--surface-card) !important;
+}
+
+#quick-filter-bar .check-button:hover {
+  color: var(--text-primary) !important;
+}
+
+#quick-filter-bar .check-button[aria-pressed="true"] {
+  background-color: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
+#qfb-qs-textbox {
+  border-radius: var(--radius-md) !important;
+}

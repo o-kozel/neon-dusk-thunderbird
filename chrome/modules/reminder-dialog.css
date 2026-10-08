@@ -1,0 +1,200 @@
+/* Reminder dialog — scope addition alongside plan §5.9 (New Event window),
+   same category: no reference mock in either .dc.html prototype, user
+   asked for it to be brought in line with the theme after seeing it
+   unstyled (08_reminder_window_01.png).
+
+   calendar-alarm-dialog.xhtml (windowtype="Calendar:AlarmWindow", 600×300
+   default, persists width/height — unlike the New Event dialog, which
+   only persists screenX/screenY). Structurally simpler than the New Event
+   dialog: everything (the richlistbox, action buttons) lives directly in
+   this one document, no inner iframe, no type="content" anywhere — no
+   chrome-vs-content split to worry about.
+
+   Selectors verified against TB 153.0 source (calendar-alarm-dialog.xhtml,
+   calendar-alarm-widget.js, calendar-alarm-dialog.css, richlistbox.css) —
+   not yet spot-checked live, treat as a first pass to diff against a
+   restart screenshot, same as every other region.
+
+   Button/field styling deliberately mirrors event-dialog.css's *final*
+   conventions (post-fixes), not its first draft — no borders on
+   secondary buttons (that was tried on the New Event toolbar and
+   explicitly reverted), bottom-hairline-only fields, same icon sizing. */
+
+html#calendar-alarm-dialog,
+html#calendar-alarm-dialog > body {
+  background-color: var(--bg-today) !important;
+}
+
+/* ---- List + selected-row color bug ---- */
+/* richlistbox.css's native richlistitem[selected="true"] rule uses the
+   system color keywords -moz-cellhighlight / SelectedItem (light blue on
+   this system, confirmed in 08_reminder_window_01.png) — the same
+   recurring "OS color bleeds through unstyled" bug already fixed in
+   message-list/reading-pane/today-pane's agenda, but via a different
+   mechanism there (a --selected-item-color custom property); richlistbox
+   uses plain system-color keywords instead, so the fix is a direct
+   background-color override rather than redeclaring a custom property. */
+#alarm-richlist {
+  background-color: var(--bg-today) !important;
+  border: 1px solid var(--border-hair) !important;
+  color: var(--text-primary) !important;
+  appearance: none !important;
+  outline: none !important;
+}
+
+richlistitem[is="calendar-alarm-widget-richlistitem"] {
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#alarm-richlist > richlistitem[selected="true"] {
+  background-color: var(--surface-card) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Native focus-ring outline (blue rectangle, confirmed live in
+   08_reminder_window_03.png) — this dialog only ever needs one card
+   interactive at a time, so a focus ring serves no real purpose;
+   stripped outright rather than recolored. First attempt only stripped
+   it from the individual richlistitem; with a second reminder added
+   (08_reminder_window_04.png) it became clear the outline was framing
+   the *whole list container* (#alarm-richlist itself, via richlistbox's
+   own appearance:auto/native listbox rendering — same class of native
+   -widget-rendering issue as the datetime picker above), not just the
+   selected card — stripped there too. */
+#alarm-richlist > richlistitem {
+  outline: none !important;
+}
+
+/* Native padding is asymmetric: unselected rows get 6px 7px, but the
+   *selected* row — which is what's actually visible, since the rendered
+   card is always selected — gets padding: 0 5px (calendar-alarm-dialog.css),
+   zeroing out vertical padding entirely. That's why the title/icon/Snooze
+   button all read as pinned to the card's edges. Give it real padding
+   instead. */
+#alarm-richlist > richlistitem[selected="true"] {
+  padding: 16px !important;
+}
+
+/* ---- Reminder card text + icon ---- */
+/* Extra top margin on top of the card's own padding above, per explicit
+   request — these two sit in the card's top row alongside the Snooze
+   button, so they need their own breathing room, not just a taller card. */
+.alarm-title-label {
+  color: var(--text-primary) !important;
+  margin-block-start: 6px !important;
+}
+
+.alarm-date-label {
+  color: var(--text-muted) !important;
+}
+
+/* Meeting-link/location text — safe to use --accent directly here (unlike
+   userContent.css's message-body links), since this is our own controlled
+   dark chrome, not an arbitrary message background. */
+.alarm-location-description,
+.alarm-location-description a {
+  color: var(--accent) !important;
+}
+
+.alarm-details-label {
+  color: var(--accent) !important;
+}
+
+/* Swap in this repo's own calendar.svg, matching every other calendar-icon
+   instance in the theme (today-pane header, status bar's Today Pane
+   toggle) rather than TB's native icon32.svg glyph. Same mask-image +
+   background-color:currentColor mechanism as every other icon swap here
+   (-moz-context-properties doesn't work on our file://-loaded SVGs). */
+.alarm-calendar-image {
+  content: none !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  background-color: var(--accent) !important;
+  mask-image: url("../icons/calendar.svg") !important;
+  inline-size: 16px !important;
+  block-size: 16px !important;
+  margin-block-start: 6px !important;
+}
+
+/* ---- Buttons: matches event-dialog.css's final (post-fix) convention —
+   no border on secondary buttons (tried once on the New Event toolbar,
+   explicitly reverted), muted default, --surface-hover on hover.
+   Dismiss/Dismiss All get --danger on hover, same as New Event's Delete
+   button — dismissing a reminder is a removal-style action. Snooze stays
+   neutral, same as New Event's Privacy/Attach. */
+.alarm-snooze-button,
+.alarm-dismiss-button,
+#alarm-snooze-all-button,
+#alarm-dismiss-all-button {
+  border: none !important;
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.alarm-snooze-button:hover,
+#alarm-snooze-all-button:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.alarm-dismiss-button:hover,
+#alarm-dismiss-all-button:hover {
+  background-color: var(--danger) !important;
+  color: #fff !important;
+}
+
+/* Per-row Snooze/Dismiss stack vertically (vbox.alarm-action-buttons) —
+   margin-block instead of the New Event toolbar's margin-inline, same
+   6px spacing value. */
+.alarm-snooze-button {
+  margin-block-end: 6px !important;
+}
+
+/* Bottom bar buttons sit side by side. */
+#alarm-snooze-all-button {
+  margin-inline-end: 6px !important;
+}
+
+/* ---- Snooze-for popup fields (number input + unit dropdown) ---- */
+/* Same macOS-style borderless/bottom-hairline field treatment established
+   in event-dialog.css for #item-title/#item-repeat etc. Only the closed
+   -state field, not the menupopup/menuitem preset list (5 min/10 min/...)
+   — native popup styling, out of scope, same boundary already drawn for
+   the New Event dialog's Category/Repeat/Reminder dropdown popups. */
+.snooze-value-textbox,
+.snooze-unit-menulist {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  border: none !important;
+  border-radius: 0 !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+.snooze-value-textbox:hover,
+.snooze-unit-menulist:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.snooze-value-textbox:focus,
+.snooze-unit-menulist:focus-within {
+  border-block-end-color: var(--accent) !important;
+}
+
+.snooze-unit-menulist::part(text-input) {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+.snooze-unit-menulist::part(dropmarker) {
+  background-color: transparent !important;
+  border: none !important;
+  fill: var(--text-muted) !important;
+}
+
+/* ---- Action bar ---- */
+#alarm-actionbar {
+  background-color: var(--bg-titlebar) !important;
+  border-block-start: 1px solid var(--border-hair) !important;
+}

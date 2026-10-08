@@ -1,0 +1,146 @@
+/* Settings (Preferences) — plan §5.10, third scope-addition item. No
+   reference mock in either prototype — general shell pass per the plan's
+   own "fix appearance" framing, not an exhaustive per-control redesign of
+   every one of the ~8 category pages (General/Appearance/Composition/
+   Privacy & Security/Chat/Calendar/Export for Mobile) — those get iterated
+   on if/when specific issues turn up, same as every other region in this
+   project.
+
+   Same structural situation as contacts.css: addressBookTab.js clones the
+   *same* #preferencesTab wrapper this pane itself uses, confirmed from
+   source — about:preferences is a type="content" browser, reached via
+   userContent.css, not userChrome.css. url-prefix() (not url()) to also
+   catch hash-addressed panes (about:preferences#privacy-chat etc.), which
+   don't reload the document.
+
+   Root cause of the reported cutoff, this time actually traced (not left
+   as a pragmatic px-override guess like contacts.css): native
+   `.paneDeckContainer` is deliberately capped at `inline-size: min(100%,
+   800px)` (preferences.css) — 100% of #preferencesContainer's own width.
+   The existing userContent.css reading-pane rules (html,body max-width:
+   760px, unscoped, flagged as a leak risk back when written and never
+   verified) constrain <body> itself first; #preferencesContainer inherits
+   that shrunk width, so `min(100%, 800px)` resolves against the smaller
+   100% instead of hitting its intended 800px ceiling — a native, generous
+   cap turned into a narrow one by an unrelated leaking rule. Canceling the
+   leak (same fix as contacts.css) should be sufficient on its own here,
+   without needing a hard px override on top. */
+
+@-moz-document url-prefix("about:preferences") {
+
+  html, body {
+    max-width: none !important;
+    margin-inline-start: 0 !important;
+    margin-inline-end: 0 !important;
+  }
+
+  /* ---- Base ---- */
+  body {
+    background-color: var(--bg-app) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-ui) !important;
+  }
+
+  #pref-category-box {
+    background-color: var(--bg-folders) !important;
+  }
+
+  #paneDeck,
+  #preferencesContainer {
+    background-color: var(--bg-app) !important;
+  }
+
+  /* ---- Category list selection ----
+     Toolkit's design-system token, not the --selected-item-color chain
+     this project has hit repeatedly elsewhere — #categories > .category
+     reads --color-accent-primary directly (common-shared.css). One
+     override should cover the selected-category color; native checkboxes/
+     radios in this document may or may not derive from the same token
+     (checkbox.css forks between a themeable "non-native" path and a true
+     OS-native appearance:auto path depending on a runtime [native]
+     attribute this couldn't be confirmed from static source) — the direct
+     accent-color property below is a free, best-effort second attempt at
+     those, not guaranteed like the category-list fix is. */
+  :root {
+    --color-accent-primary: var(--accent) !important;
+    --color-accent-primary-active: var(--accent) !important;
+    accent-color: var(--accent);
+  }
+
+  #categories > .category:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .category-name {
+    color: inherit !important;
+  }
+
+  /* ---- Headings ---- */
+  html|h1 {
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+  }
+
+  html|legend {
+    color: var(--text-second) !important;
+  }
+
+  .subcategory:not([hidden]) ~ .subcategory {
+    border-block-start-color: var(--border-hair) !important;
+  }
+
+  description,
+  label {
+    color: var(--text-second) !important;
+  }
+
+  .tip-caption {
+    color: var(--text-faint) !important;
+  }
+
+  /* ---- Search box ---- */
+  #searchInput {
+    background-color: var(--surface-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-line) !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  /* ---- Generic form controls (menulist/button/text inputs) ----
+     Broad-strokes token pass, not per-instance — this document has
+     dozens of these across every category page, all built from the same
+     shared widget classes. */
+  menulist,
+  button,
+  html|input:is([type="email"], [type="number"], [type="color"], [type="text"], [type="password"], [type="url"], [type="search"]),
+  html|textarea,
+  html|select {
+    background-color: var(--surface-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-line) !important;
+  }
+
+  menulist:hover,
+  button:hover {
+    background-color: var(--surface-hover) !important;
+  }
+
+  menulist::part(dropmarker-icon) {
+    stroke: var(--text-muted) !important;
+  }
+
+  /* ---- Sidebar footer (Account Settings / Add-ons and Themes) ---- */
+  .sidebar-footer-link {
+    color: var(--text-muted) !important;
+  }
+
+  .sidebar-footer-link:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  a {
+    color: var(--accent) !important;
+  }
+}

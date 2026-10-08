@@ -1,0 +1,498 @@
+/* Reading pane — plan §5.5. Selectors verified against TB 153.0 source
+   (aboutMessage.xhtml, shared/messageHeader.css) extracted from the Flatpak
+   omni.ja — not yet spot-checked live via Browser Toolbox for hover/uidensity
+   edge cases, so treat overrides here as a first pass to diff against a
+   restart screenshot, same as every other region.
+
+   Structural note: the reading pane's content (#messageHeader, the reply/
+   forward/archive toolbar, attachment view) lives in a *separate* top-level
+   document, about:message, loaded via <xul:browser id="messageBrowser">
+   inside <message-pane id="messagePane"> — not the same about:3pane document
+   the folder pane/message list live in. Per the message-list shadow-DOM saga,
+   userChrome.css has still been reaching every privileged chrome-type
+   document so far; if these rules show zero trace in the Rules panel the way
+   message-list.css once did, check the Style Editor's rule count for this
+   file in that document before assuming a selector problem.
+
+   Known, unavoidable structural deviations from the prototype (confirmed
+   from source, logged in README "Deviations"):
+   - The prototype's clean two-band layout (52px action toolbar, then a
+     separate sender/avatar row below) doesn't exist as such — real TB puts
+     the reply/forward/archive buttons in the *same* row as the From field
+     (#headerSenderToolbarContainer, flex row-reverse: buttons first, then
+     sender info), not a separate band above it.
+   - No inline reply box under the message body at all (grepped aboutMessage.xhtml
+     for any inline-compose/quick-reply markup — none exists). Thunderbird
+     opens replies in a separate compose window/tab. The prototype's "Draft
+     with AI" mock button has no real element to attach to.
+   - No deterministic per-sender avatar color — TB's own `.recipient-avatar`
+     (in header-fields.js) already renders a colored circle with the sender's
+     first initial with zero JS shim needed (unlike message-list's row avatar,
+     which genuinely has no element at all), but the circle's color is one
+     flat token for every sender, not a per-sender hash color. */
+
+#messagepanebox,
+#singleMessage {
+  background-color: var(--bg-reading) !important;
+}
+
+/* Show attachments above the body instead of below it. Real DOM (confirmed
+   from aboutMessage.xhtml): #messagepanebox's direct children, in source
+   order, are #singleMessage (contains the whole header — msgHeaderView,
+   imip-bar, etc.), #calendarInvitationDisplayContainer (hidden unless it's
+   an invite), #messagepane (the body <browser>), #attachment-splitter, then
+   #attachmentView. #attachmentView is literally the *last* sibling, which
+   is why it always rendered at the very bottom. #messagepanebox is a XUL
+   vbox (flex-direction: column per toolkit's xul.css), so its children are
+   flex items — reorderable the same way subject/sender were, just one
+   level up the tree. Pushing only #messagepane to order:1 (leaving
+   #attachment-splitter/#attachmentView at the default 0) moves body after
+   them without needing to touch #attachmentView's own order.
+
+   CAVEAT: this is a *visual* reorder only. #attachment-splitter's
+   resize/collapse behavior (resizebefore="closest" etc.) is driven by real
+   DOM adjacency in JS, not CSS order — dragging it after this change may
+   not resize what it now visually sits next to. Flagging before testing,
+   not after a confusing screenshot. */
+#messagepane {
+  order: 1 !important;
+}
+
+/* ---- Header container ---- */
+#messageHeader {
+  background-color: var(--bg-reading) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+  padding-inline: 16px !important;
+}
+
+/* The prototype shows Subject as a large heading ABOVE the sender/avatar
+   line (reference/Thunderbird Dark v1.dc.html lines 194-209: <h1>Subject,
+   then the avatar+name+date row below it). Real TB's DOM order is reversed
+   — #headerSenderToolbarContainer (avatar/sender/buttons) comes before
+   #headerSubjectSecurityContainer (subject) — confirmed in
+   04_reading_pane_09.png. .message-header-container is `display: grid`
+   (messageHeader.css), so its .message-header-row children are reorderable
+   via the `order` property without touching the DOM. */
+#headerSubjectSecurityContainer {
+  order: -1;
+}
+
+#expandedsubjectBox {
+  font-size: 18px !important;
+  color: var(--text-strong) !important;
+}
+
+#headerSubjectSecurityContainer {
+  margin-block-end: 8px !important;
+}
+
+/* Two-band layout (toolbar on its own line above sender info) was tried per
+   the prototype's separate action-toolbar band and confirmed working
+   (04_reading_pane_11.png), but the user reverted it after seeing it live
+   (04_reading_pane_14.png) — it left a distractingly empty gap to the left
+   of Reply/Forward with nothing sharing that line. Reverted to TB's natural
+   single fused row (toolbar + sender info together, row-reverse) rather
+   than forcing the split. #starMessageButton lives *inside*
+   #header-view-toolbar (confirmed from source), not #expandedfromRow, so
+   it's back on the same line as the buttons, which is also where it
+   started — item 3 (star position) is moot now that this reverted. */
+
+/* ---- Action toolbar buttons ---- */
+/* TB's own messageHeader.css draws a border on every .message-header-view-button
+   via --toolbarbutton-header-bordercolor (confirmed in 04_reading_pane_01/02.png:
+   Archive/Spam/More all rendered as bordered pills identically to Forward,
+   not the plain icon-only look the spec calls for). Strip it here so only
+   Reply/Reply All/Forward (below) get an explicit box. */
+.message-header-view-button {
+  border-color: transparent !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-muted) !important;
+}
+
+.message-header-view-button:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Reply / Reply All / Reply-to-Sender: all accent-filled, same pill style —
+   matches folder-pane's New Message button.
+
+   TB's real show/hide logic (msgHdrView.js UpdateReplyButtons/IsReplyAllEnabled)
+   is an either/or toggle: #hdrReplyButton (plain "Reply") shows for
+   single-recipient messages; #hdrReplyAllButton (a split button with its own
+   dropdown) replaces it for multi-recipient messages. #hdrReplyToSenderButton
+   is a *third*, separate button that TB shows *alongside* Reply All
+   specifically so there's still a one-click "just reply to the sender"
+   option when "Reply" is hidden — confirmed via 04_reading_pane_13.png,
+   where it rendered with zero styling (we'd only ever targeted
+   #hdrReplyButton, not this sibling) since it's not simply a variant of the
+   same button. Styling all three identically is easier and more consistent
+   than trying to suppress one via CSS (TB's hidden-attribute toggling is
+   JS-driven, not something a stylesheet can override), and directly matches
+   what the user asked for: same look for Reply/Reply All, with the native
+   two-button choice kept intact rather than removed. */
+#hdrReplyButton,
+#hdrReplyToSenderButton {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border-radius: var(--radius-md) !important;
+  min-block-size: 32px !important;
+  padding-inline: 12px !important;
+}
+
+#hdrReplyButton:hover,
+#hdrReplyToSenderButton:hover {
+  filter: brightness(1.08);
+}
+
+/* Reply All is a split button (is="toolbarbutton-menu-button"): the visible
+   label and the dropdown chevron are two separate sub-elements
+   (.toolbarbutton-menubutton-button / .toolbarbutton-menubutton-dropmarker),
+   both need the accent fill for the whole control to read as one pill. */
+#hdrReplyAllButton,
+#hdrReplyAllButton > .toolbarbutton-menubutton-button,
+#hdrReplyAllButton > .toolbarbutton-menubutton-dropmarker {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border-radius: var(--radius-md) !important;
+  min-block-size: 32px !important;
+}
+
+#hdrReplyAllButton > .toolbarbutton-menubutton-button {
+  padding-inline: 12px !important;
+}
+
+#hdrReplyAllButton:hover > .toolbarbutton-menubutton-button,
+#hdrReplyAllButton:hover > .toolbarbutton-menubutton-dropmarker {
+  filter: brightness(1.08);
+}
+
+/* Forward: outline button */
+#hdrForwardButton {
+  border: 1px solid var(--border-line) !important;
+  background-color: transparent !important;
+  color: var(--text-second) !important;
+  border-radius: var(--radius-md) !important;
+  min-block-size: 32px !important;
+}
+
+#hdrForwardButton:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Keep "Reply All" on one line — real TB only shows this button once a
+   message has multiple recipients (hidden="hidden" by default otherwise,
+   confirmed from source — that's correct native behavior, not a bug), but
+   its label was wrapping to two lines when it did appear. */
+#hdrReplyAllButton .toolbarbutton-text {
+  white-space: nowrap !important;
+}
+
+/* Divider between the labeled buttons (Reply/Reply All/Forward) and the
+   icon-only group, matching the prototype's 1px vertical hairline
+   (reference .dc.html line 184). */
+#hdrArchiveButton {
+  border-inline-start: 1px solid var(--border-line) !important;
+  margin-inline-start: 6px !important;
+  padding-inline-start: 10px !important;
+}
+
+/* Archive/Spam/Delete/More: the prototype (Thunderbird Dark v1.dc.html
+   lines 185-189) draws these as plain 32x32 icon-only squares, no text —
+   only Reply/Reply All/Forward carry a label. Real TB always shows the
+   .toolbarbutton-text label unless the whole header has the
+   .message-header-buttons-only-icons class, which we can't toggle from CSS
+   alone — so hide the text on just these four directly and constrain them
+   to a square instead. */
+#hdrArchiveButton,
+#hdrJunkButton,
+#hdrTrashButton,
+#otherActionsButton {
+  min-inline-size: 32px !important;
+  padding-inline: 0 !important;
+  justify-content: center !important;
+}
+
+#hdrArchiveButton .toolbarbutton-text,
+#hdrJunkButton .toolbarbutton-text,
+#hdrTrashButton .toolbarbutton-text,
+#otherActionsButton .toolbarbutton-text {
+  display: none !important;
+}
+
+/* Delete: red hover, matches the prototype's destructive-hover spec */
+#hdrTrashButton:hover {
+  background-color: var(--danger) !important;
+  color: #fff !important;
+}
+
+/* Swap in this repo's own icon set for Archive/Junk/Trash (user's explicit
+   choice: archive.svg / snooze.svg / trash.svg — trash.svg stays on the real
+   Delete button; #otherActionsButton/"More" keeps TB's native kebab icon,
+   untouched). These normally paint via `list-style-image: var(--icon-x)` on
+   the button (messageHeader.css), rendered through the button's anonymous
+   `.toolbarbutton-icon` child — but per the spaces-rail/folder-pane finding,
+   -moz-context-properties never resolves for our own file://-loaded SVGs, so
+   mask-image + background-color is used instead, same as everywhere else.
+   `.toolbarbutton-icon` as the mask target is a well-established Gecko
+   toolbarbutton selector, but NOT yet live-verified in this specific
+   about:message document — first pass, expect to iterate after a screenshot,
+   same as every other icon-swap region so far. */
+#hdrArchiveButton,
+#hdrJunkButton,
+#hdrTrashButton {
+  list-style-image: none !important;
+}
+
+#hdrArchiveButton .toolbarbutton-icon,
+#hdrJunkButton .toolbarbutton-icon,
+#hdrTrashButton .toolbarbutton-icon {
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  background-color: currentColor !important;
+  inline-size: 15px !important;
+  block-size: 15px !important;
+}
+
+#hdrArchiveButton .toolbarbutton-icon {
+  mask-image: url("../icons/archive.svg") !important;
+}
+
+#hdrJunkButton .toolbarbutton-icon {
+  mask-image: url("../icons/snooze.svg") !important;
+}
+
+#hdrTrashButton .toolbarbutton-icon {
+  mask-image: url("../icons/trash.svg") !important;
+}
+
+/* Star: gold on hover/flagged, TB's own icon uses -moz-context-properties
+   against currentColor here (chrome://-origin star.svg, unaffected by the
+   file://-origin restriction that blocks our own chrome/icons/*.svg set). */
+#starMessageButton:hover {
+  color: var(--star-active) !important;
+}
+
+#starMessageButton.flagged {
+  color: var(--star-active) !important;
+}
+
+/* ---- Avatar ---- */
+/* --recipient-avatar-size/-color/-background-color are declared on :root and
+   redeclared again at :root[uidensity="compact"/"touch"] (shared/messageHeader.css)
+   — same cascade-tie risk already seen on spaces-rail/folder-pane, so
+   !important throughout. */
+:root {
+  --recipient-avatar-size: 44px !important;
+  --recipient-avatar-color: var(--accent) !important;
+  --recipient-avatar-background-color: var(--accent-soft) !important;
+}
+
+.recipient-avatar {
+  font-weight: 600 !important;
+  font-size: 15px !important;
+}
+
+/* ---- Sender / date text ---- */
+#expandedfromBox .recipient-single-line,
+#expandedfromBox .recipient-multi-line-name {
+  color: var(--text-strong) !important;
+  font-weight: 600 !important;
+}
+
+#expandedfromBox .recipient-multi-line-address {
+  color: var(--text-muted) !important;
+}
+
+#dateLabel {
+  color: var(--text-faint) !important;
+  font-size: 12px !important;
+}
+
+#expandedtoBox {
+  color: var(--text-faint) !important;
+}
+
+/* Sender/recipient hover: messageHeader.css's .header-recipient:hover paints
+   from --selected-item-color — the same OS AccentColor blue we already
+   fought on the attachment list (rgb(61,174,233) there) — confirmed via
+   04_reading_pane_18.png as a harsh solid-blue block with hard-to-read text.
+   Same fix pattern: scope the override to this class rather than touching
+   --selected-item-color globally (shared across ~48 skin files). Applies to
+   both the From (sender) and To/Cc recipient chips, since both use
+   .header-recipient. */
+.header-recipient:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ---- Tags (closest match to the prototype's category chip) ---- */
+/* Tag pill coloring needs no override — confirmed via 04_reading_pane_08.png
+   (Important/Personal/Later tags added live). Each tag is a real light-DOM
+   <li class="tag"> (header-fields.js buildTags()), colored inline from
+   MailServices.tags.getColorForKey() — the user's actual configured tag
+   colors, not a shadow-DOM dead-end like message-list's <thread-card-tags>.
+   Already renders as a proper colored pill (padding + border-radius from
+   messageHeader.css's own .tag rule). Forcing a flat token color here would
+   overwrite the user's real per-tag colors for no benefit — same reasoning
+   as folder-pane/message-list leaving user-configured colors alone.
+
+   Position: tried the mock-up's inline placement (tags next to the avatar
+   row) via `position: absolute`, but abandoned it after two rounds of
+   collisions (04_reading_pane_17.png: pixel-measured the actual gap between
+   sender text and the Reply button — ~429px, in the *middle* of the fused
+   row — while `right: 16px` anchored tags to the *far* right edge instead,
+   which is exactly where the icon buttons/star live, guaranteeing overlap).
+   The real free space is a variable-width middle gap bounded by sender-text
+   length on one side and toolbar width (which changes with Reply vs.
+   Reply+Reply All) on the other — neither edge is stable enough to anchor
+   to reliably without JS. User chose the robust option: leave tags on their
+   own row (natural flow, no absolute positioning), styled tight and
+   right-aligned so it reads as attached to the header rather than a
+   distant separate section.
+
+   `justify-content: flex-end` on .tags-list alone didn't right-align
+   anything (confirmed via 04_reading_pane_19.png: tags rendered flush left,
+   under the avatar, not under the buttons) — #expandedtagsRow itself was
+   sitting at its content width on the left rather than filling the row, so
+   there was no extra space for flex-end to push into. `justify-self: end`
+   on the row (a grid item of .message-header-container) positions the
+   whole row against the right edge directly, landing it under the
+   Reply/Forward/icon buttons instead of under the avatar/sender text. */
+#expandedtagsRow {
+  justify-self: end !important;
+  margin-block-start: -4px !important;
+  padding-block-end: 4px !important;
+}
+
+/* ---- Attachments ---- */
+#attachmentBar {
+  background-color: var(--surface-card) !important;
+  border-radius: var(--radius-lg) !important;
+  padding-block: 6px !important;
+}
+
+#attachmentName {
+  color: var(--text-primary) !important;
+}
+
+#attachmentSize,
+#attachmentCount {
+  color: var(--text-faint) !important;
+}
+
+#attachmentView,
+#attachmentList {
+  border-color: var(--border-hair) !important;
+}
+
+/* Card redo (2026-07-27): the prototype's attachment chip (reference .dc.html
+   lines 225-232) is a bordered card with a 34px colored "PDF"-lettered tile
+   and filename/size stacked in two lines — genuinely different from TB's
+   real one-line icon+name+size row. Two things make most of this achievable
+   in CSS alone, confirmed from attachment-list.mjs source rather than
+   assumed:
+   - .attachmentcell-extension already contains the real file extension as
+     text (`item.querySelector(".attachmentcell-extension").textContent =`),
+     including its leading dot (e.g. ".pdf") — no JS shim needed to get a
+     type label, just to style this existing text as the tile.
+   - .attachmentcell-icon (TB's own small generic/moz-icon glyph) is a
+     sibling, not a parent — safe to hide outright and let the
+     extension-tile take over that visual role.
+   Rebuilt .attachmentItem as a 2-column CSS grid (tile column + text
+   column) instead of fighting its native single-row flex layout: DOM order
+   is icon, name, extension, size (all direct children, confirmed from
+   source), so explicit grid-column/-row placement is used rather than
+   relying on source order.
+   Known simplification: one consistent tile color for every attachment,
+   not per-file-type colors — CSS has no selector that can branch on the
+   extension span's text content, only on HTML attributes, and none expose
+   the type. The leading dot in ".pdf" is also left as-is (cosmetic only;
+   hiding a single leading character from a plain text node reliably isn't
+   worth the fragility of a ::first-letter trick here). */
+#attachmentList .attachmentItem {
+  display: grid !important;
+  grid-template-columns: 34px 1fr !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 10px !important;
+  row-gap: 2px !important;
+  align-items: center !important;
+  padding: 8px 10px !important;
+  border: 1px solid var(--border-hair) !important;
+  background-color: var(--surface-card) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+#attachmentList .attachmentItem + .attachmentItem {
+  margin-block-start: 6px !important;
+}
+
+#attachmentList .attachmentcell-icon {
+  display: none !important;
+}
+
+#attachmentList .attachmentcell-extension {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  inline-size: 34px !important;
+  block-size: 34px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--danger-soft) !important;
+  color: var(--danger-ink) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+}
+
+#attachmentList .attachmentcell-name {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  color: var(--text-primary) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#attachmentList .attachmentcell-size {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  color: var(--text-muted) !important;
+  font-size: 11px !important;
+  opacity: 1 !important;
+  margin: 0 !important;
+}
+
+#attachmentList .attachmentItem:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+/* attachmentList.css's own [selected="true"] (and the higher-specificity
+   .attachmentList:focus &[selected="true"] variant) paint from
+   --selected-item-color — TB's system AccentColor, confirmed rendering as a
+   flat OS blue (rgb(61,174,233) sampled from 04_reading_pane_06.png), not
+   our theme. --selected-item-color itself is shared across ~48 skin files
+   (folder pane, message list, address book, ...), so overriding it globally
+   would recolor unrelated native selection UI — scope the fix to this list
+   only instead.
+
+   Originally used a full accent-soft background wash for selected, matching
+   folder-pane/message-list's convention — but on this card specifically it
+   muddied the tile's red tint and the grey size text against it (confirmed
+   via 04_reading_pane_22.png: a teal-brown wash that made the ".pdf"
+   salmon and "1.1 MB" grey both noticeably harder to read than on the
+   card's normal neutral background). Switched to a colored border instead
+   of a background change, so the card's background — and every text
+   color tuned against it — stays constant regardless of selection state. */
+#attachmentList .attachmentItem[selected="true"] {
+  background-color: var(--surface-card) !important;
+  border-color: var(--accent) !important;
+  color: var(--text-strong) !important;
+}

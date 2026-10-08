@@ -1,0 +1,445 @@
+/* Today pane — plan §5.6. Selectors verified against TB 153.0 source
+   (messenger.xhtml, calendar/skin/classic/calendar/shared/today-pane.css,
+   shared/calendar-task-tree.css), extracted from the Flatpak omni.ja —
+   not yet spot-checked live via Browser Toolbox for hover/uidensity edge
+   cases, so treat as a first pass to diff against a restart screenshot,
+   same as every other region.
+
+   Structural note: unlike the reading pane, the today pane lives in the
+   *main* messenger.xhtml chrome window (not a separate about:message/
+   about:3pane document) — #today-pane-panel is a direct part of the same
+   window spaces-rail/folder-pane/message-list live in, so no chrome-vs-
+   content split to worry about here.
+
+   Known, likely deviations to verify on first screenshot (confirmed from
+   source, not yet confirmed live):
+   - Real TB shows a "mini-day" widget (#mini-day-box: big date number,
+     weekday/month labels, prev/next/today nav) above the agenda list,
+     which the prototype doesn't have at all (prototype goes straight from
+     header to "Events"). collapsedinmodes="" on that box suggests it's
+     never auto-collapsed in any mode — hidden below via display:none to
+     match the prototype; if that's wrong for some interaction mode, it'll
+     need to be conditional instead of blanket-hidden.
+   - Tasks are a real XUL <tree> (is="calendar-task-tree-todaypane"), not a
+     simple list of styled rows — themeable only through -moz-tree-*
+     pseudo-elements (background-color, color, list-style-image,
+     -moz-context-properties on chrome://-origin icons), a much smaller API
+     than plain CSS on light-DOM elements. The prototype's custom rounded
+     16px checkbox shape is very likely not achievable this way — recoloring
+     TB's own checkbox glyph is, reshaping it probably isn't. Logging as a
+     probable deviation pending screenshot confirmation rather than a
+     definite one, since -moz-tree-image's exact capabilities aren't fully
+     verified without seeing it render. */
+
+/* ---- Panel shell ---- */
+#today-pane-panel {
+  background-color: var(--bg-today) !important;
+  border-inline-start: 1px solid var(--border-hair) !important;
+  color: var(--text-second) !important;
+}
+
+/* #1 root cause (confirmed live via Browser Toolbox + today-pane.js source,
+   2026-07-28): #today-pane-header is not decorative "Today, <date>" text —
+   it's a functional label whose `value` attribute is set by JS to one of
+   "Events and Tasks"/"Tasks Only"/"Events Only" (cycled by the prev/next
+   buttons either side of it), confirmed by the DOM showing
+   value="Events"[-only]. Real content, correctly present in the DOM — but
+   putting `display:flex` and a `::before` pseudo directly on the label
+   broke Gecko's native attribute-driven value rendering (nothing painted).
+   Fixed by moving the flex layout + icon to the .sidebar-header wrapper
+   instead, leaving the label itself with no display/pseudo-element
+   overrides so its native value text renders normally. */
+#today-pane-panel > .sidebar-header {
+  background-color: var(--bg-today) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+  padding-inline: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+#today-pane-panel > .sidebar-header::before {
+  content: "" !important;
+  display: inline-block !important;
+  flex: none !important;
+  inline-size: 15px !important;
+  block-size: 15px !important;
+  margin-inline-end: 8px !important;
+  mask-image: url("../icons/calendar.svg") !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  background-color: var(--accent) !important;
+}
+
+#today-pane-header {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+.today-pane-cycler,
+#today-closer {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.today-pane-cycler:hover,
+#today-closer:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Mini-day widget (big date number + nav arrows): not in the prototype at
+   all. First-pass guess — hide it; revisit if this turns out to be needed
+   in some mode/interaction the prototype doesn't show. */
+#mini-day-box {
+  display: none !important;
+}
+
+/* ---- Agenda (Events) ---- */
+#agenda-toolbar {
+  background-color: var(--bg-today) !important;
+}
+
+/* Kept as a plain text+icon affordance (no reference mock exists for this
+   button — it's a real TB feature the prototype doesn't show), but given
+   the same radius/padding/hover treatment as the other today-pane icon
+   buttons (.today-pane-cycler/#today-closer) plus the agenda's own type
+   scale, so it doesn't read as unstyled next to them. */
+#todaypane-new-event-button {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+  padding-inline: 8px !important;
+  padding-block: 4px !important;
+}
+
+#todaypane-new-event-button:hover {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+  /* Native rule swaps border-color from transparent to
+     --toolbarbutton-hover-bordercolor on hover, giving it a button/outline
+     look; keep it transparent so hover reads as a flat highlight instead. */
+  border-color: transparent !important;
+}
+
+#todaypane-new-event-button > .toolbarbutton-text {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+#agenda {
+  background-color: var(--bg-today) !important;
+  border-block-start: none !important;
+}
+
+/* Bumped from --text-faint to --text-muted and given more padding/margin
+   than the native 6px/9px — per explicit user ask for more height/contrast
+   on the day-group headers (TODAY, THURSDAY 30 JULY, ...). */
+.agenda-date-header {
+  background-color: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.6px !important;
+  text-transform: uppercase !important;
+  padding-block: 10px 6px !important;
+  margin-block-start: 14px !important;
+}
+
+/* Event card. .agenda-listitem-calendar starts as a small 10px inline dot
+   (background-color: var(--item-backcolor), the real per-calendar color) —
+   reshaped into the prototype's 3px full-height left bar via absolute
+   positioning instead, without touching --item-backcolor so the user's
+   real calendar colors still flow through unchanged. */
+.agenda-listitem-details {
+  position: relative !important;
+  background-color: var(--surface-card) !important;
+  border-radius: var(--radius-lg) !important;
+  padding-inline-start: 16px !important;
+  margin-block-end: 7px !important;
+}
+
+.agenda-listitem-details:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.agenda-listitem-calendar {
+  position: absolute !important;
+  inset-inline-start: 6px !important;
+  top: 6px !important;
+  bottom: 6px !important;
+  inline-size: 3px !important;
+  block-size: auto !important;
+  border-radius: var(--radius-sm) !important;
+  margin: 0 !important;
+}
+
+/* Multi-row card: caption above start time (revised per user — flipped
+   from an earlier title-below pass) with the title carrying the visual
+   accent and time downgraded to a quiet secondary line. Native TB lays
+   time/title/relative out inline on one row instead
+   (.agenda-listitem-details-inner has no layout of its own — flex:1 only
+   applies to it as a child of the outer .agenda-listitem-details row, its
+   own children just flow inline). Can't touch the DOM (CSS-only), so force
+   the row break with the flex-wrap + flex-basis:100% trick: whichever
+   element gets flex-basis:100% forces everything after it onto the next
+   line, without needing to actually wrap them in a shared element. Same
+   "order generalizes to any flex/grid container" pattern used elsewhere in
+   this theme (message-list, reading-pane).
+   NOT done here — flagged separately for the user, needs a JS shim:
+   duration (native only ever renders a single start time, never an
+   end-time/duration string, for a normal same-day event), location, and
+   participant icons are not in this template's DOM at all — nothing for
+   CSS to select. */
+.agenda-listitem-details {
+  padding-block: 12px !important;
+}
+
+.agenda-listitem-details-inner {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: baseline !important;
+  gap: 3px 6px !important;
+}
+
+.agenda-listitem-time {
+  order: 1 !important;
+  color: var(--text-faint) !important;
+  font-size: 11.5px !important;
+  font-weight: 400 !important;
+}
+
+.agenda-listitem-title {
+  order: -1 !important;
+  flex-basis: 100% !important;
+  color: var(--text-primary) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.agenda-listitem-relative {
+  order: 2 !important;
+  color: var(--text-faint) !important;
+}
+
+/* All-day events: native TB routes .agenda-listitem-all-day through a
+   completely different rule than timed events — flat --item-backcolor wash
+   on the row itself, and both the calendar-color bar and the time slot
+   hidden outright. Reference screenshot shows all-day events with the exact
+   same card+left-bar styling as timed events, with "All day" where the time
+   normally goes. Override the wash back to the shared card background/hover
+   and un-hide the bar + time slot; .agenda-listitem-time is confirmed empty
+   text for all-day items in source (today-pane-agenda.js only ever sets its
+   textContent for timed events), so a generated ::before is safe here and
+   isn't clobbering real content. */
+.agenda-listitem-all-day .agenda-listitem-details {
+  background-color: var(--surface-card) !important;
+}
+
+.agenda-listitem-all-day .agenda-listitem-details:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+.agenda-listitem-all-day :is(.agenda-listitem-calendar, .agenda-listitem-time) {
+  display: inline-block !important;
+}
+
+.agenda-listitem-all-day .agenda-listitem-time::before {
+  content: "All day" !important;
+}
+
+/* Selected agenda item paints from --selected-item-color/-text-color (OS
+   AccentColor) via #agenda's --selected-background/-foreground custom
+   properties — same recurring bug as the attachment list and the
+   reading-pane recipient hover. Scoped to #agenda rather than the shared
+   --selected-item-color variable (used in ~48 skin files). */
+#agenda {
+  --selected-background: var(--accent-soft) !important;
+  --selected-foreground: var(--text-strong) !important;
+}
+
+/* ---- Tasks ---- */
+#today-pane-splitter {
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#todo-tab-panel {
+  background-color: var(--bg-today) !important;
+}
+
+#show-completed-checkbox-box {
+  color: var(--text-muted) !important;
+}
+
+/* Column headers: the prototype shows a plain checkbox+title list, no
+   column header row. ROOT CAUSE of the long-standing "Tasks pane rows
+   render blank" bug (rounds 4/5/7 all guessed at cell/row text-color
+   fixes and none of them worked): this native XUL <tree> binds its
+   columns from the <treecols> frame tree at layout time, and
+   `display: none` prevents that frame from being constructed at all —
+   confirmed live via Browser Toolbox console
+   (`document.getElementById("unifinder-todo-tree").columns.count`
+   read 0 with 3 real rows in the view). With zero bound columns the
+   tree body has nothing to key cell rendering off of, so no row ever
+   painted a checkbox or title regardless of any ::-moz-tree-cell-text
+   color rule. Collapsing to zero height instead of display:none keeps
+   the frame (and the columns) alive while still visually hiding the
+   header bar. */
+#unifinder-todo-tree > treecols {
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+.calendar-task-tree {
+  background-color: var(--bg-today) !important;
+  color: var(--text-second) !important;
+}
+
+.calendar-task-tree > treechildren {
+  background-color: var(--bg-today) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-row {
+  background-color: transparent !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-row(hover) {
+  background-color: var(--surface-hover) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-row(selected) {
+  background-color: var(--accent-soft) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-cell-text {
+  color: var(--text-second) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-cell-text(selected) {
+  color: var(--text-strong) !important;
+}
+
+/* Calendar-mode round 5: user reports task rows are still blank (no
+   checkbox, no title) until selected, even after round 4's inprogress/
+   overdue compound-state fix. Toolkit's own baseline
+   (toolkit/global/tree/tree.css) is `treechildren::-moz-tree-cell-text {
+   color: inherit }` for the plain state — nothing there should be beating
+   our `.calendar-task-tree`-scoped !important rule above, and reasoning
+   from source alone hasn't turned up why it still fails for these
+   specific rows. Adding the same rule scoped directly by this tree's own
+   ID instead of the JS-added class, as a second, independent selector
+   path in case the class-based one isn't matching for a reason not
+   visible from static source (belt-and-braces, same approach used for
+   the New Event button's color in event-dialog.css/calendar.css). If
+   this still doesn't fix it, this needs a live Browser Toolbox check —
+   specifically what state/property these 3 tasks actually carry — rather
+   than another blind guess. */
+#unifinder-todo-tree > treechildren::-moz-tree-cell-text {
+  color: var(--text-second) !important;
+}
+
+#unifinder-todo-tree > treechildren::-moz-tree-cell-text(selected),
+#unifinder-todo-tree > treechildren::-moz-tree-cell-text(selected, focus) {
+  color: var(--text-strong) !important;
+}
+
+/* Checkbox glyph is chrome://-origin (--icon-checkbox), so -moz-context-
+   properties works normally here — unlike this repo's own SVGs. Accent
+   fill only when completed, matching the prototype's checked state. */
+.calendar-task-tree > treechildren::-moz-tree-image(calendar-task-tree-col-completed) {
+  fill: var(--text-muted) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-image(calendar-task-tree-col-completed, completed) {
+  fill: var(--accent) !important;
+}
+
+/* Strikethrough is already native (text-decoration:line-through on
+   .completed); just recolor to muted so it reads as "done" against the
+   dark background instead of TB's default text color. */
+.calendar-task-tree > treechildren::-moz-tree-cell-text(completed) {
+  color: var(--text-faint) !important;
+  font-style: normal !important;
+}
+
+/* Calendar-mode round 4 (09_calendar_04.png): user reported "3 lines are
+   in the list but nothing is visible" for this exact tree shown in the
+   Calendar tab's Tasks pane. Root cause found in a file this region never
+   accounted for, calendar-task-tree.css (loaded separately from
+   today-pane.css but styling the same .calendar-task-tree class): it
+   hardcodes `::-moz-tree-row(inprogress, selected, focus) { background-
+   color: var(--color-green-50) !important }` and the `overdue` equivalent
+   with `--color-red-40` — both bypass our tokens entirely, and because
+   they match *more* pseudo-states than our plain `::-moz-tree-row
+   (selected)` above, they win for any task that's in-progress or overdue
+   (apparently all of the visible ones), landing on a solid native-green
+   fill with `--selected-item-text-color` text that wasn't legible against
+   it. This never surfaced in Mail-mode verification because none of that
+   pass's test tasks happened to be in either state. Overriding the same
+   compound pseudo-states with theme tokens instead. */
+.calendar-task-tree > treechildren::-moz-tree-row(inprogress, selected, focus),
+.calendar-task-tree > treechildren::-moz-tree-row(overdue, selected, focus) {
+  background-color: var(--accent-soft) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-cell-text(inprogress, selected, focus),
+.calendar-task-tree > treechildren::-moz-tree-cell-text(overdue, selected, focus) {
+  color: var(--text-strong) !important;
+}
+
+/* Same two states' *un*-selected text colors are also hardcoded
+   (--color-green-50 / --color-red-40 respectively) — not the invisibility
+   bug, but still a native-color leak inconsistent with the rest of the
+   theme's token usage, fixed alongside while in this file. */
+.calendar-task-tree > treechildren::-moz-tree-cell-text(inprogress) {
+  color: var(--accent) !important;
+}
+
+.calendar-task-tree > treechildren::-moz-tree-cell-text(overdue) {
+  color: var(--danger-ink) !important;
+}
+
+/* ---- calendar-dialog quick-view popup: KNOWN ISSUE, deferred, no CSS fix ---- */
+/* Not part of the today-pane DOM (it's appended to a shared
+   .calendar-dialog-root elsewhere in messenger.xhtml) — noted here since
+   Today Pane is where it was found and this is the file a future session
+   will look in first.
+
+   Double-clicking an event in the Today Pane opens <dialog id="calendarDialog"
+   is="calendar-dialog"> mispositioned (e.g. left: -158px), overlapping the
+   folder pane. Two CSS mitigations were tried and both failed — root cause
+   confirmed via Browser Toolbox + calendar-dialog.mjs source to be
+   different from what either attempt assumed:
+
+   `connectedCallback()` in calendar-dialog.mjs hardcodes
+   `this.container = document.getElementById("calendarDisplayBox")` —
+   #calendarDisplayBox belongs to the Calendar tab's own layout, and is
+   inactive/hidden while browsing Mail. PositionedDialog's #update() still
+   runs and still sets inline left/top (confirmed live: the dialog DOES
+   carry a `left` value every time), it just computes garbage from that
+   container's degenerate getBoundingClientRect() when the Calendar tab
+   isn't active. This is NOT a missing-trigger-selector issue — that was
+   this repo's first, wrong theory (see git history / PROGRESS.md for the
+   two superseded attempts, both since removed from this file since they
+   never matched anything and were confirmed live to have zero effect).
+
+   Why there's no CSS fix here: both the broken (Today-Pane-triggered,
+   #calendarDisplayBox hidden) and working (Calendar-tab-triggered,
+   #calendarDisplayBox active) cases set an inline `left`/`top` — nothing
+   in the resulting stylesheet-visible state distinguishes "computed from a
+   valid container" from "computed from a hidden zero-size one". A blanket
+   `!important` position override would fix the Today Pane case but also
+   clobber the Calendar tab's correctly-working positioning, which must
+   stay untouched. A real fix needs `this.container` patched in JS (e.g.
+   fall back to a container that's valid regardless of active tab) — needs
+   `js/shim.uc.js`, blocked on this Flatpak install (see PROGRESS.md /
+   [[project-tb-dark-theme-env]] memory).
+
+   User decision: accept as a known limitation, deferred to be revisited
+   once everything else in the project is done — not blocking any other
+   region's work (confirmed independent of the New Event window,
+   §5.9). Don't re-attempt a CSS mitigation without new information; the
+   structural reason above is why the first two attempts couldn't have
+   worked. */

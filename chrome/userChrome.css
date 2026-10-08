@@ -1,0 +1,37 @@
+/* Thunderbird Dark — app chrome (mail, calendar, toolbars).
+   Region modules are @import-ed in build order (plan §5 / §10). */
+
+@import "tokens.css";
+@import "modules/spaces-rail.css";
+@import "modules/tabs-toolbar.css";
+@import "modules/folder-pane.css";
+@import "modules/message-list.css";
+@import "modules/reading-pane.css";
+@import "modules/today-pane.css";
+@import "modules/statusbar.css";
+@import "modules/calendar.css";
+@import "modules/event-dialog.css";
+@import "modules/reminder-dialog.css";
+
+/* ---- Global shell ---- */
+
+* {
+  font-family: var(--font-ui) !important;
+}
+
+#messengerBody,
+#tabmail-container,
+#tabpanelcontainer {
+  background-color: var(--bg-app) !important;
+}
+
+:root {
+  scrollbar-color: rgba(255,255,255,.09) transparent !important;
+  scrollbar-width: thin !important;
+}
+
+/* Hairline separators between the app's own chrome regions */
+#titlebar,
+toolbar {
+  border-color: var(--border-hair) !important;
+}

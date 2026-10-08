@@ -1,0 +1,238 @@
+/* Folder pane — plan §5.3. Selectors verified against TB 153.0 source
+   (about3Pane.xhtml, about3Pane.css, shared/list-container.css,
+   folderColors.css) — the folder pane lives in the about:3pane document,
+   not messenger.xhtml, but userChrome.css still cascades into it.
+
+   Row/selection mechanics: each folder is <li is="folder-tree-row"> (class
+   .selected when active) wrapping a <div class="container"> that carries
+   the actual background/border, plus a nested <ul> for children. TB paints
+   its own folder-type icons via `content: var(--icon-x)` + -moz-context-
+   properties wired to a --icon-color custom property, itself resolved from
+   `var(--icon-color, var(--folder-color-X))` per data-folder-type. We swap
+   in our own icon set instead (mask-image, see that rule's own comment for
+   why not context-properties), but keep reading the same --icon-color
+   chain for the paint color, so user-customized tag-folder colors (set
+   inline by JS) and the account-color-driven Inbox tint are unaffected. */
+
+/* #folderPane is a CSS Grid item (grid-area: folders); its rendered width
+   comes from the grid column track, not its own `width`. The track size is
+   `minmax(auto, var(--folderPaneSplitter-width))` on <body id="paneLayout">
+   (default 18em) — and the resize splitter (<hr is="pane-splitter"
+   id="folderPaneSplitter">) writes that same variable back as an *inline*
+   style once a user drags it, so !important is required to reliably win
+   (same lesson as the spaces rail's --spaces-total-width). */
+body {
+  --folderPaneSplitter-width: var(--folders-w) !important;
+}
+
+#folderPane {
+  background-color: var(--bg-folders) !important;
+}
+
+/* The visible divider between the folder pane and thread pane is this
+   splitter element's own border, not a border on #folderPane itself. */
+#folderPaneSplitter {
+  border-color: var(--border-hair) !important;
+}
+
+#folderPaneHeaderBar {
+  padding: 12px 12px 10px !important;
+  gap: 8px !important;
+  background-color: transparent !important;
+}
+
+#folderPaneGetMessages,
+#folderPaneMoreButton {
+  box-sizing: border-box !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--surface-card) !important;
+  color: var(--text-muted) !important;
+}
+
+#folderPaneGetMessages:hover,
+#folderPaneMoreButton:hover {
+  color: var(--text-primary) !important;
+}
+
+#folderPaneWriteMessage {
+  box-sizing: border-box !important;
+  flex: 1 !important;
+  height: 32px !important;
+  border-radius: var(--radius-md) !important;
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  font-weight: 600 !important;
+}
+
+#folderPaneWriteMessage:hover {
+  filter: brightness(1.08);
+}
+
+/* Row shape. padding-inline-start is left untouched — it carries TB's own
+   per-depth subfolder indent (--indent: calc(16px * var(--depth))). TB's
+   own default has no explicit padding-block (row height comes from
+   min-block-size elsewhere), which renders visibly taller/looser than the
+   prototype's compact rows — set explicitly to match spec (~6-7px). */
+#folderTree .container {
+  margin-inline: 6px !important;
+  padding-block: 6px !important;
+  border-radius: var(--radius-md) !important;
+}
+
+#folderTree li:not(.selected) > .container {
+  border-color: transparent !important;
+}
+
+#folderTree li:not(.selected) > .container:hover {
+  background-color: var(--surface-hover-soft) !important;
+  border-color: transparent !important;
+}
+
+#folderTree li.selected > .container,
+#folderTree li.selected.current > .container,
+#folderTree li.selected > .container:hover {
+  background-color: var(--accent-soft) !important;
+  border-color: transparent !important;
+}
+
+/* Left accent bar on the selected row */
+#folderTree li.selected > .container::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+}
+
+#folderTree .name {
+  color: var(--text-second);
+}
+
+#folderTree li.selected > .container .name {
+  color: var(--text-strong) !important;
+  font-weight: 600 !important;
+}
+
+/* Custom folder icon set, via mask-image rather than TB's own
+   content: var(--icon-x) + -moz-context-properties. Confirmed on the
+   spaces rail (see that file's own writeup) that context-fill/context-
+   stroke never applies to any of our own chrome/icons/*.svg files — the
+   restriction is origin-based (chrome:// only), not specific to the rail,
+   so it applies here too for the same reason. mask-image sidesteps it the
+   same way: content: none blanks TB's own icon, and background-color reads
+   --icon-color first, so tag-folder custom colors (set inline by JS as
+   --icon-color) and the account-color-driven Inbox tint still flow through
+   exactly as before — only the paint mechanism changed.
+
+   Only special-purpose folder types get a custom icon below — there's no
+   dedicated plain "folder" glyph in this icon set (folder-all.svg is a
+   grid, meant for the "All Mail" concept, not a generic fallback; using it
+   as one earlier made every ordinary user folder show a grid icon, which
+   is what prompted this comment). Generic/custom folders (no special
+   data-folder-type — e.g. this profile's Harmony, TaxFree, HAH, etc.) are
+   deliberately left alone, keeping TB's own plain folder icon recolored
+   via --folder-color-folder below. */
+#folderTree .icon {
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+#folderTree li:is(
+    [data-folder-type="inbox"],
+    [data-folder-type="drafts"],
+    [data-folder-type="templates"],
+    [data-folder-type="sent"],
+    [data-folder-type="outbox"],
+    [data-folder-type="trash"],
+    [data-folder-type="archive"],
+    [data-folder-type="junk"],
+    [data-folder-type="virtual"],
+    [data-server-type="none"]
+  ) > .container > .icon {
+  content: none !important;
+  background-color: var(--icon-color, var(--text-muted)) !important;
+}
+
+#folderTree li[data-folder-type="inbox"] > .container > .icon {
+  mask-image: url("../icons/folder-inbox.svg") !important;
+}
+#folderTree li[data-folder-type="drafts"] > .container > .icon,
+#folderTree li[data-folder-type="templates"] > .container > .icon {
+  mask-image: url("../icons/folder-drafts.svg") !important;
+}
+#folderTree li[data-folder-type="sent"] > .container > .icon {
+  mask-image: url("../icons/folder-sent.svg") !important;
+}
+#folderTree li[data-folder-type="outbox"] > .container > .icon {
+  mask-image: url("../icons/folder-outbox.svg") !important;
+}
+#folderTree li[data-folder-type="trash"] > .container > .icon {
+  mask-image: url("../icons/trash.svg") !important;
+}
+/* TB maps Gmail's "All Mail" to the "archive" special-folder-type — it
+   exposes no separate attribute to distinguish it from a real Archive
+   folder, so both would get whatever we set here. folder-all.svg (a grid)
+   reads better for "All Mail" than archive.svg's box-with-lid, which this
+   profile's actual All Mail folder was showing and looked wrong. */
+#folderTree li[data-folder-type="archive"] > .container > .icon {
+  mask-image: url("../icons/folder-all.svg") !important;
+}
+#folderTree li[data-folder-type="junk"] > .container > .icon {
+  mask-image: url("../icons/folder-spam.svg") !important;
+}
+#folderTree li[data-folder-type="virtual"] > .container > .icon {
+  mask-image: url("../icons/filter.svg") !important;
+}
+/* Local Folders root entry has no data-folder-type (it's a server, not a
+   folder) — has its own dedicated icon in the set. */
+#folderTree li[data-server-type="none"] > .container > .icon {
+  mask-image: url("../icons/local-folders.svg") !important;
+}
+
+/* Flat single-tone folder icons (kill TB's per-type legacy colors, e.g.
+   the yellow generic-folder icon) — these are only the *fallback* used
+   when a folder has no user-customized color, so tag-folder custom colors
+   (set inline by JS) are unaffected. */
+:root {
+  --folder-color-inbox: var(--text-muted) !important;
+  --folder-color-draft: var(--text-muted) !important;
+  --folder-color-sent: var(--text-muted) !important;
+  --folder-color-archive: var(--text-muted) !important;
+  --folder-color-trash: var(--text-muted) !important;
+  --folder-color-template: var(--text-muted) !important;
+  --folder-color-newsletter: var(--text-muted) !important;
+  --folder-color-outbox: var(--text-muted) !important;
+  --folder-color-folder: var(--text-muted) !important;
+  --folder-color-folder-filter: var(--text-muted) !important;
+  --folder-color-folder-rss: var(--text-muted) !important;
+  --folder-color-rss: var(--text-muted) !important;
+  --folder-color-spam: var(--danger-ink) !important;
+}
+
+/* Selected row's icon always goes accent, overriding folder-type/custom
+   color — matches the prototype's selected-Inbox treatment. */
+#folderTree li.selected > .container > .icon {
+  background-color: var(--accent) !important;
+}
+
+/* Badges */
+#folderTree .folder-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-card);
+  color: var(--text-muted);
+}
+
+#folderTree li.selected > .container .folder-count-badge {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}

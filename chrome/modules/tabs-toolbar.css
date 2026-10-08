@@ -1,0 +1,135 @@
+/* Tabs toolbar — plan §5.10 scope addition. Selectors verified against
+   TB 153.0 source (messenger.xhtml, shared/tabmail.css, tabmail-tab.js).
+   No reference mock exists for this region (the prototype never opens a
+   second tab) — change list reviewed with the user before implementing,
+   same document-then-review pattern as the event/reminder dialogs.
+
+   #tabs-toolbar sits directly below the main toolbar in messenger.xhtml;
+   the tab strip itself (#tabmail-tabs > tab is="tabmail-tab") is a plain
+   XUL/custom-element structure, no shadow DOM, no chrome-vs-content split
+   to worry about (unlike reading-pane/today-pane). */
+
+/* Native paints the top hairline via a background-image gradient
+   (chrome-content-separator-color -> tabs-toolbar-background-color), not a
+   plain border — replaced wholesale rather than fighting the gradient. */
+#tabs-toolbar {
+  appearance: none !important;
+  background-image: none !important;
+  background-color: var(--bg-titlebar) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+  box-shadow: none !important;
+}
+
+/* Base tab text/icon color. Native's own rule chain resolves to the same
+   toolbar-text-color for selected/unselected either way absent an actual
+   lwtheme, but set both explicitly rather than relying on that.
+
+   border-radius/flex/inline-size: round all 4 corners (mock's selected tab
+   is a small floating pill, not a browser-tab shape docked flush to the
+   content below — round-only-top read wrong against 02-calendar.png) and
+   don't flex-grow to fill the toolbar (native `.tabmail-tab` uses `flex:
+   100 100` with `inline-size: 0`, and the `--tab-max-width`/`--tab-min-width`
+   vars its max/min-inline-size depend on are referenced but never actually
+   defined anywhere in TB's source, so that constraint is a no-op and tabs
+   grow to fill all available space — mock's tabs hug their label instead). */
+.tabmail-tab {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+  flex: 0 1 auto !important;
+  inline-size: auto !important;
+}
+
+.tabmail-tab:hover {
+  color: var(--text-primary) !important;
+}
+
+.tabmail-tab[selected="true"] {
+  color: var(--text-strong) !important;
+}
+
+.tabmail-tab:hover .tab-background:not([selected="true"]) {
+  background-color: var(--surface-hover) !important;
+}
+
+/* The actual painted layer for the selected tab is .tab-background, not
+   .tabmail-tab itself (confirmed in tabmail.css) — overriding the tab
+   directly would do nothing for the fill. */
+.tab-background[selected="true"] {
+  background-color: var(--surface-card) !important;
+  background-image: none !important;
+}
+
+/* Mock has no underline anywhere — the selected tab is marked only by the
+   card background + bold text + accent icon (see .tab-icon-image below).
+   Round 1 recolored .tab-line from native OS-blue to --accent, which was
+   the wrong fix entirely: the line itself shouldn't render at all. */
+.tab-line {
+  display: none !important;
+}
+
+/* Selected tab's icon reads accent while its text stays --text-strong —
+   two different colors on one tab, confirmed against the mock crop, so
+   this can't just ride the tab's own `color` (currentColor) the way the
+   unselected/hover states do. .tab-icon-image is a chrome://-origin icon
+   (-moz-context-properties: fill, stroke reading currentColor), so setting
+   `color` directly on it is enough — it doesn't affect the label's color,
+   since color doesn't inherit "outward" to siblings. */
+.tabmail-tab[selected="true"] .tab-icon-image {
+  color: var(--accent) !important;
+}
+
+/* Native hides the close button on the first tab unconditionally
+   (.tabmail-tab:first-child .tab-close-button { display: none }, tabmail.css)
+   — the mock shows one on Inbox (the first tab) regardless, so force it
+   back. This only restores visibility; whatever tabmail.js does on click
+   (close vs. no-op for a primary tab) is untouched, native behavior. */
+.tabmail-tab:first-child .tab-close-button {
+  display: flex !important;
+}
+
+/* Tab close button: currentColor already flows through from the tab's own
+   `color`, so only the hover/active wash needs a token swap (native uses a
+   flat white/black color-mix regardless of theme). */
+button.tab-close-button:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+button.tab-close-button:hover:active {
+  background-color: var(--surface-hover-soft) !important;
+}
+
+/* Swap in this repo's own close.svg (user's explicit choice, matching the
+   icon set used everywhere else) instead of TB's native glyph. The icon is
+   a plain <html:img src="chrome://.../close.svg"> (tabmail-tab.js), not a
+   list-style-image/content-driven icon, and -moz-context-properties never
+   resolves for our own file://-loaded SVGs (established finding from the
+   spaces-rail build) — mask-image + background-color:currentColor instead,
+   same mechanism as every other icon swap in this theme. */
+.tab-close-icon {
+  content: none !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  mask-image: url("../icons/close.svg") !important;
+  background-color: currentColor !important;
+  inline-size: 13px !important;
+  block-size: 13px !important;
+}
+
+/* All-tabs dropdown chevron and the tab-overflow scroll arrows are TB's own
+   chrome://-origin icons (--icon-nav-down-sm / native scrollbutton parts),
+   unaffected by the file://-SVG context-properties issue above — a plain
+   color override is enough, same as the calendar mini-month's chevrons. */
+#alltabs-button {
+  color: var(--text-muted) !important;
+}
+
+#alltabs-button:hover {
+  color: var(--text-primary) !important;
+  background-color: var(--surface-hover) !important;
+}
+
+#tabmail-arrowscrollbox::part(scrollbutton-up),
+#tabmail-arrowscrollbox::part(scrollbutton-down) {
+  color: var(--text-muted) !important;
+}

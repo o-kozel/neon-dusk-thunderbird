@@ -1,0 +1,121 @@
+/* Spaces rail — plan §5.2. Selectors verified against TB 153.0 source
+   (IMPLEMENTATION_PLAN.md §4).
+
+   Each button's icon is painted via `mask-image` + `background-color` on
+   the child <img> (content: none to blank out TB's own icon), not via
+   -moz-context-properties — see the icon-override rule below for why
+   that mechanism doesn't work for these file://-loaded custom SVGs.
+
+   Prototype rail order is Mail, Calendar, Contacts, Tasks, Chat, Settings,
+   but TB's DOM order is Mail, Contacts, Calendar, Tasks, Chat, Settings —
+   fixed below with flex `order` (deviation: keyboard arrow-key navigation
+   still follows DOM order, so it won't match the visual order exactly). */
+
+:root {
+  /* Keep the rail's own inline-size (padding*2 + button width) and the
+     margin TB pushes onto sibling content (#messengerBody, #titlebar, and
+     #unifiedToolbarContainer — the last one lives inside <unified-toolbar>'s
+     shadow root, unreachable by a new selector, so it can only be fixed by
+     making sure this inherited variable resolves to the right value)
+     in sync with --rail-w, instead of hardcoding a second number that can
+     drift. !important because these are plain :root declarations tying
+     with TB's own — needed to reliably win the cascade. */
+  --spaces-padding: calc((var(--rail-w) - 38px) / 2) !important;
+  --spaces-total-width: var(--rail-w) !important;
+  --spaces-bg-image: none;
+}
+
+/* Icon overrides. NOT via `content: url(...)` + -moz-context-properties —
+   confirmed by a live test (hardcoding the icons' stroke to a fixed color)
+   that context-fill/context-stroke recoloring never applies to these SVGs:
+   it's a Gecko restriction that context-fill/context-stroke only work for
+   chrome://-origin images, and these load via file:// through the profile's
+   symlinked chrome/ folder. `content: url()` itself worked fine (the red
+   test render proved the file loads and paints) — only the recolor step
+   was silently no-oping, which is why every earlier attempt (custom
+   properties, then direct `content`) produced blank or coincidentally-TB
+   icons no matter how the cascade/specificity was fixed.
+   mask-image + background-color sidesteps context-properties entirely:
+   the SVG is used purely as an alpha mask, and background-color (a plain
+   CSS color, not a same-origin-gated paint keyword) supplies the visible
+   color — so it still tracks currentColor/hover/active state dynamically. */
+#mailButton img,
+#addressBookButton img,
+#calendarButton img,
+#tasksButton img,
+#chatButton img,
+#settingsButton img,
+#collapseButton img {
+  content: none !important;
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+#mailButton img        { mask-image: url("../icons/mail.svg") !important; }
+#addressBookButton img { mask-image: url("../icons/contacts.svg") !important; }
+#calendarButton img    { mask-image: url("../icons/calendar.svg") !important; }
+#tasksButton img       { mask-image: url("../icons/tasks.svg") !important; }
+#chatButton img        { mask-image: url("../icons/chat.svg") !important; }
+#settingsButton img    { mask-image: url("../icons/settings.svg") !important; }
+/* No dedicated collapse glyph in the icon set; closest available. */
+#collapseButton img    { mask-image: url("../icons/chevron-left.svg") !important; }
+
+#spacesToolbar {
+  box-sizing: border-box !important;
+  width: var(--rail-w) !important;
+  background-color: var(--bg-rail) !important;
+  border-inline-end-color: var(--border-hair) !important;
+}
+
+/* Belt-and-suspenders: force the push directly on the two light-DOM
+   targets (mirrors TB's own selectors in spacesToolbar.css) so an
+   unresolved --spaces-total-width can't leave the rail overlapping the
+   menubar/tabs-toolbar/folder pane. */
+#spacesToolbar:not([hidden]) ~ #messengerBody,
+:root:not(.customizingUnifiedToolbar) #spacesToolbar:not([hidden]) ~ #navigation-toolbox #titlebar {
+  margin-inline-start: var(--rail-w) !important;
+}
+
+.spaces-toolbar-button {
+  position: relative;
+  box-sizing: border-box !important;
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+  border-radius: var(--radius-lg) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted) !important;
+}
+
+.spaces-toolbar-button:hover:not(.current) {
+  background-color: var(--surface-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.spaces-toolbar-button.current {
+  background-color: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
+/* Visual reorder to match the prototype (Mail, Calendar, Contacts, ...) */
+#mailButton        { order: 1; }
+#calendarButton    { order: 2; }
+#addressBookButton { order: 3; }
+#tasksButton       { order: 4; }
+#chatButton        { order: 5; }
+
+/* Left accent bar on the active item, flush with the rail's outer edge */
+.spaces-toolbar-button.current::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(var(--spaces-padding) * -1);
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+}
+

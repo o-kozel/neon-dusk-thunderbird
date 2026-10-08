@@ -1,0 +1,792 @@
+/* Calendar grid + sidebar — plan §5.8. Selectors verified against TB 153.0
+   source (messenger.xhtml, calendar/skin/classic/calendar/shared/
+   calendar-views.css, shared/widgets/calendar-widgets.css,
+   shared/widgets/minimonth.css, calendar-day-label.js) — not yet
+   spot-checked live via Browser Toolbox, so treat as a first pass to diff
+   against a restart screenshot, same as every other region.
+
+   Structural note confirmed from source, not a guess: #calSidebar (whole
+   left column: #primaryButtonSidePanel/#sidePanelNewEvent, #minimonth-pane/
+   #calMinimonth, #calendar-panel/#calendar-list-pane) and
+   #calendarDisplayBox (the main area: the collapsible #calendar-view-box
+   "Unifinder" events-listing table, #calendarViewHeader toolbar, #view-box
+   grid) are siblings under #calendarContent. */
+
+/* ---- Global calendar-tab backgrounds ---- */
+#calSidebar {
+  background-color: var(--bg-today) !important;
+}
+
+#calendarDisplayBox {
+  background-color: var(--bg-titlebar) !important;
+}
+
+/* ---- Native accent-color leak: --selected-item-color ----
+   Recurring bug, confirmed for the 7th+ time in this project (event-dialog,
+   today-pane, and now here): --selected-item-color falls through to the OS
+   AccentColor system color. In the calendar tab it surfaces in at least
+   four places at once, all reading the same variable (confirmed from
+   source): .button-primary's background (--button-primary-background-color:
+   var(--selected-item-color) — this is the "New Event" button's blue fill),
+   calendar-minimonth's --mmDaySelectedBackground/-BorderColor/
+   --mmHighlightBackground, #calendar-list's focus-within/.selected
+   background, and calendar-day-label[relation="today"]'s text color.
+   One override at the two container roots fixes all four rather than
+   chasing each widget — scoped to #calSidebar/#calendarDisplayBox instead
+   of a bare :root, since :root here is the *whole main window* (shared
+   with Mail/Tasks/Chat tabs), and this file loads globally via
+   userChrome.css. */
+#calSidebar,
+#calendarDisplayBox {
+  --selected-item-color: var(--accent) !important;
+  --selected-item-text-color: var(--accent-ink) !important;
+}
+
+/* ---- "New Event" primary button ---- */
+/* Confirmed as #sidePanelNewEvent (hidden="hidden" in the static markup,
+   toggled visible by JS for the calendar tab specifically — the New Event
+   button rendering in the live screenshot is this element, confirmed from
+   calendar-modes.js: `document.getElementById("sidePanelNewEvent").hidden
+   = false` on entering calendar mode). Still rendered native blue after
+   restart (09_calendar_02.png) despite the --selected-item-color override
+   above, which should reach it via .button-primary's `background-color:
+   var(--button-primary-background-color)` → `var(--selected-item-color)`
+   indirection (confirmed both declared in messenger/shared/variables.css,
+   no other definition of --button-primary-background-color found anywhere
+   in the extracted skin) — the chain SHOULD resolve, but without live
+   DOM access to confirm why it doesn't, setting the color directly here
+   too rather than debugging the indirection further blind. */
+#sidePanelNewEvent {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border-color: transparent !important;
+  border-radius: var(--radius-md) !important;
+  font-weight: 600 !important;
+  min-block-size: 32px !important;
+}
+
+#sidePanelNewEvent:hover {
+  filter: brightness(1.08);
+}
+
+/* Full-width per spec ("full-width accent New event button"). Confirmed
+   from source: #primaryButtonSidePanel is `.sidebar-panel-header`
+   (display:flex) with an ID-specific `justify-content: center` override
+   (calendar-widgets.css) — center-positions the button at its intrinsic
+   content width rather than stretching it. flex-grow on the button fills
+   the row regardless of the parent's justify-content. */
+#sidePanelNewEvent {
+  flex: 1 1 auto !important;
+}
+
+/* ---- Mini-month (#calMinimonth) ---- */
+/* User feedback round 3 (09_calendar_03.png): today's shape should be a
+   rounded RECTANGLE, not a circle — confirmed against the reference
+   screenshot (screenshots/02-calendar.png), today (16) renders as a solid
+   rounded-square fill, not a circle. Overriding round 1's 999px (full
+   circle) down to a modest radius. */
+calendar-minimonth {
+  --mmDayBorderRadius: var(--radius-sm) !important;
+}
+
+/* User feedback round 2 (09_calendar_02.png): today's circle read as a
+   translucent wash with green-on-green text, not a solid accent fill with
+   ink text. Root cause: --mmDaySelectedTodayBackground (used when a day is
+   both selected AND today, minimonth.css) is color-mix(selected-item-color
+   20%, transparent) — a light wash by design, not solid — and its `color`
+   comes from the plainer [selected="true"] rule's --mmDaySelectedColor
+   (var(--selected-item-color) itself, i.e. plain accent green), since
+   [today="true"][selected="true"] and [selected="true"] have identical
+   (0,2,0) specificity and the today-specific --mmDayTodayColor rule loses
+   the source-order tie for the "color" property specifically. Forcing
+   both backgrounds (today-alone and today+selected, since either can be
+   true depending on whether the user has navigated the mini-month away
+   from today) to solid --accent with !important, and forcing color
+   directly on [today="true"] with !important so it wins regardless of
+   the selected-state tie. */
+calendar-minimonth {
+  --mmDayTodayBackground: var(--accent) !important;
+  --mmDayTodayBorderColor: var(--accent) !important;
+  --mmDaySelectedTodayBackground: var(--accent) !important;
+  --mmDaySelectedTodayBorderColor: var(--accent) !important;
+}
+
+.minimonth-day[today="true"] {
+  color: var(--accent-ink) !important;
+  font-weight: 700 !important;
+}
+
+/* User feedback round 2: mini-month should blend into the same background
+   as the Calendars list panel below it (#calSidebar, already --bg-today),
+   not sit in its own lighter native gray box. --mmMainBackground/
+   --mmBoxBackground/--mmMainBorderColor default to mid-gray tokens
+   (light-dark(gray-20/50) etc., confirmed in minimonth.css) that read as
+   a distinct boxed widget against the dark sidebar — flatten to
+   transparent/hairline so it reads as part of the same surface. */
+calendar-minimonth {
+  --mmMainBackground: transparent !important;
+  --mmBoxBackground: transparent !important;
+  --mmBoxBorderColor: transparent !important;
+  --mmBoxItemColor: var(--text-muted) !important;
+}
+
+/* User feedback round 3: remove the outer border entirely (round 2 only
+   softened it to --border-hair). */
+#minimonth-pane calendar-minimonth {
+  border: none !important;
+}
+
+/* User feedback round 3: tint the row containing the current week, per
+   the reference mock (13-15 in screenshots/02-calendar.png show a subtle
+   --accent-soft-like wash across the whole week row, not just today's
+   cell). Previously logged as impossible without a JS shim — that was
+   wrong: each week is a real <html:tr class="minimonth-row-body">
+   (confirmed in calendar-minimonth.js), so :has() can select the row
+   containing today's cell directly, no DOM inspection or JS needed. Only
+   non-today cells in the row show the tint distinctly, since today's own
+   cell already has its own solid --accent fill on top. */
+.minimonth-row-body:has(.minimonth-day[today="true"]) {
+  background-color: var(--accent-soft) !important;
+}
+
+/* User feedback round 3: remove the "has event" dots entirely. */
+.minimonth-day::after {
+  content: none !important;
+}
+
+/* User feedback round 3: clean up the header nav — reference mock shows
+   plain "July 2026" text with no divider lines between month/year/icon
+   sections. Structurally these are still two separate nav sections
+   (calendar-minimonth.js keeps month and year as distinct controls with
+   their own prev/next), can't be merged into one text run from CSS, but
+   the vertical divider borders between them (.minimonth-nav-item,
+   border-inline: 1px solid var(--mmBoxItemColor)) can go, and the
+   chevrons themselves get a muted/hover-accent treatment consistent with
+   the rest of the theme's icon-button language instead of native gray. */
+.minimonth-nav-item {
+  border-inline: none !important;
+}
+
+/* These buttons paint their chevron icon via `stroke` (confirmed in
+   minimonth.css: `stroke: var(--sidebar-color)`, consumed by the
+   background-image icons through -moz-context-properties: stroke), not
+   `color` — overriding `color` alone would leave the glyph untouched. */
+.minimonth-header-btn,
+.minimonth-header button {
+  stroke: var(--text-muted) !important;
+}
+
+.minimonth-header-btn:hover,
+.minimonth-header button:hover {
+  stroke: var(--accent) !important;
+}
+
+/* ---- Day-column headers (calendar-day-label) ---- */
+/* Today's text color already fixed by the --selected-item-color override
+   above (calendar-day-label[relation="today"] { color:
+   var(--selected-item-color); }, confirmed in calendar-views.css) — no
+   separate rule needed here.
+
+   KNOWN LIMITATION: confirmed from calendar-day-label.js, the weekday name
+   and the date are rendered as ONE localized text string on a single
+   <label> ("day-header" fluent value, e.g. "Tuesday 28 Jul") — there is no
+   separate date-number sub-element to isolate. The reference mock's "30px
+   accent-filled circle around just the date number" can't be built from
+   CSS alone without restructuring the label's contents (a JS shim), so
+   this stays a plain colored text label rather than a circle badge. Log
+   in README "Deviations" rather than attempting a wrong-shaped fake. */
+
+/* User feedback round 4: header row taller, different font style, and
+   thinner cell borders overall.
+   - .day-column-heading's padding-block is 1px 2px (calendar-views.css) —
+     a tight native default; increasing it directly grows the row height
+     (calendar-header-container's height is otherwise computed from its
+     child's layout, per the "must have inset-*-start set in javascript"
+     note in source — no separate height property to target).
+   - calendar-day-label can't isolate the date number from the weekday
+     name (see limitation above), so uppercase + letter-spacing on the
+     whole label is the closest CSS-only approximation of the mock's
+     small-caps weekday style, applied without disturbing the
+     already-fixed today color.
+   - Cell/hour-line borders all read from --viewBorderColor
+     (var(--layout-border-0) at :root) — overriding that one variable
+     (scoped to #view-box, same mechanism as --viewBackground above)
+     thins every border in the grid at once instead of chasing each of
+     the half-dozen individual border declarations that reference it. */
+.day-column-heading {
+  padding-block: 8px !important;
+}
+
+calendar-day-label {
+  text-transform: uppercase !important;
+  letter-spacing: 0.4px !important;
+  font-size: 12px !important;
+}
+
+#view-box {
+  --viewBorderColor: var(--border-hair) !important;
+}
+
+/* ---- Grid background ---- */
+/* User feedback round 4: the grid read as a visibly different shade from
+   #calendarViewHeader above it. Root cause: .multiday-hour-box/
+   calendar-header-container's background-color is var(--viewBackground)
+   (calendar-views.css), which resolves to var(--layout-background-0) at
+   :root — a different token from --bg-titlebar entirely, not just a
+   lighter/darker variant of it. Overriding the --viewBackground
+   *variable* on #view-box (rather than fighting every consumer's
+   background-color individually) also keeps --viewWeekendBackground/
+   --viewTodayOffBackground etc. (several of which derive from
+   --viewBackground via color-mix) consistent, instead of just patching
+   the one property that happened to be visible. */
+#view-box {
+  --viewBackground: var(--bg-titlebar) !important;
+}
+
+/* User feedback round 5: off-hours/weekend columns should read darker,
+   closer to the main grid background, not stand out lighter. Confirmed
+   from source these don't automatically follow the --viewBackground fix
+   above: --viewOffTimeBackground is a flat hsla(0,0%,60%,0.1) white
+   overlay (unrelated to --viewBackground entirely), and
+   --viewWeekendBackground's dark-mode formula (color-mix(--viewBackground
+   80%, --color-ink-40)) mixes in a lighter gray on top of it — both
+   lighten rather than darken.
+
+   User feedback round 6: round 5's darkening (mixed toward black) went
+   too far the other way — barely distinguishable from the main grid.
+   Wanted: lighter than the main background (still a visible highlight,
+   like the original native intent) but darker than the native default's
+   fairly strong lightening. Splitting the difference with a light mix
+   instead of a dark one.
+
+   User feedback round 7: dial the lightening back a bit further, but it
+   must stay at or lighter than --bg-titlebar, never cross into darker. */
+#view-box {
+  --viewOffTimeBackground: color-mix(in srgb, white 2.5%, var(--bg-titlebar)) !important;
+  --viewWeekendBackground: color-mix(in srgb, white 2.5%, var(--bg-titlebar)) !important;
+}
+
+/* ---- Events (timed grid + all-day) ---- */
+/* .calendar-color-box is shared by calendar-event-box (week/day grid),
+   calendar-editable-item (all-day header row), and
+   calendar-month-day-box-item (month view) — one override covers all
+   three. Confirmed from source: background-color: var(--item-backcolor)
+   is a flat, fully-opaque fill (calendar-editable-item.js/
+   calendar-month-view.js set --item-backcolor/--item-forecolor per-event
+   to the real subscribed-calendar color via an indirection variable,
+   var(--calendar-<id>-backcolor)) — this is why events render as solid
+   saturated blocks instead of the mock's soft-tint + left-border look.
+   Soften the background with color-mix against the real --item-backcolor
+   (so each calendar's own color still comes through, just muted) instead
+   of hardcoding a single tint, same "preserve real per-item color, just
+   reshape the presentation" pattern as today-pane's agenda cards. Text
+   switches to --text-strong instead of the native --item-forecolor, since
+   forecolor was tuned for contrast against the old fully-saturated fill,
+   not this new dark soft one. */
+/* User feedback round 2 (09_calendar_02.png): the orange/red "Polish"
+   event read as a muddy brown block, not a clean soft tint like the blue
+   one. Root cause: mixing a warm hue toward near-black in sRGB
+   (color-mix(in srgb, ...)) collapses red/orange toward brown/maroon — a
+   well-known perceptual artifact of linear-in-sRGB interpolation, not a
+   bug specific to this color. Mixing in OKLCH instead (perceptually
+   uniform space) keeps warm hues legible at the same dark backdrop
+   without that muddying, while cool hues like blue are barely affected
+   either way — no per-hue special-casing needed. */
+.calendar-color-box {
+  background-color: color-mix(in oklch, var(--item-backcolor) 35%, var(--bg-titlebar)) !important;
+  border-inline-start: 3px solid var(--item-backcolor) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--text-strong) !important;
+}
+
+/* Selected-event state hardcodes Photon blue (--color-blue-50), same
+   native-blue-vs-accent mismatch as everywhere else in this project. */
+calendar-month-day-box-item[selected="true"].calendar-color-box,
+calendar-event-box[selected="true"].calendar-color-box,
+calendar-editable-item[selected="true"].calendar-color-box {
+  background-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
+.event-name-label {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+.item-time-label {
+  font-size: 10px !important;
+  opacity: 0.85;
+}
+
+/* User feedback round 4: narrow/overlapping event chips (short-duration
+   events stacked side by side) show text touching almost flush against
+   the left border — confirmed via zoomed crop. .calendar-item-flex
+   already has `padding: 4px 5px` (calendar-views.css), but that reads as
+   too tight once the 3px left border is added on top; a few more px of
+   start padding gives the text breathing room without affecting the
+   wider single events. */
+.calendar-item-flex {
+  padding-inline-start: 8px !important;
+}
+
+/* ---- "Events in the Next 7 Days" unifinder panel ---- */
+/* Confirmed with user: a real TB feature (an events search/listing table
+   docked above the toolbar), no reference mock equivalent — same
+   real-functionality-over-no-mock situation as the status bar/today-pane
+   header text. Was left completely native/untouched in the first pass;
+   styling it now to the theme's token language rather than leaving it as
+   a jarring native-gray strip. Confirmed selectors from source:
+   #unifinder-searchBox (dropdown + search row), #event-filter-menulist
+   ("Events in the Next 7 Days"), #unifinder-search-field (search input),
+   #unifinder-search-results-tree (a plain XUL <tree>, themed via
+   -moz-tree-* pseudo-elements same mechanism as today-pane's task tree). */
+#unifinder-searchBox {
+  background-color: var(--bg-titlebar) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+  color: var(--text-second) !important;
+}
+
+#event-filter-menulist,
+#unifinder-search-field {
+  background-color: var(--surface-card) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-line) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+#event-filter-menulist:focus-within,
+#unifinder-search-field:focus {
+  border-color: var(--accent) !important;
+}
+
+#unifinder-search-results-tree {
+  background-color: var(--bg-titlebar) !important;
+  color: var(--text-second) !important;
+}
+
+#unifinder-search-results-tree-cols {
+  background-color: var(--bg-titlebar) !important;
+  color: var(--text-muted) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+#unifinder-search-results-tree > treechildren {
+  background-color: var(--bg-titlebar) !important;
+}
+
+#unifinder-search-results-tree > treechildren::-moz-tree-row {
+  background-color: transparent !important;
+  border-color: var(--border-hair) !important;
+}
+
+#unifinder-search-results-tree > treechildren::-moz-tree-row(hover) {
+  background-color: var(--surface-hover) !important;
+}
+
+#unifinder-search-results-tree > treechildren::-moz-tree-row(selected) {
+  background-color: var(--accent-soft) !important;
+}
+
+#unifinder-search-results-tree > treechildren::-moz-tree-cell-text {
+  color: var(--text-second) !important;
+}
+
+#unifinder-search-results-tree > treechildren::-moz-tree-cell-text(selected) {
+  color: var(--text-strong) !important;
+}
+
+/* ---- Today column: no background wash ---- */
+/* User feedback round 8: today should be marked ONLY by the header's font
+   style (already native — .day-column-heading picks up color:
+   var(--selected-item-color); font-weight: bold for .day-column-today,
+   no rule needed here since --selected-item-color is already
+   accent-retargeted app-wide), no background tint anywhere on the column,
+   including off-hours cells.
+   --viewTodayOffBackground derives from --viewTodayBackground
+   (calendar-views.css: `color-mix(in srgb, var(--viewTodayBackground) 95%,
+   black)`), so overriding --viewTodayBackground alone (round 8's first
+   attempt) still left a faint ~5%-darker residual instead of true parity
+   with a normal day's off-hours cells — confirmed live
+   (09_calendar_09.png) as "another background for after business hour on
+   today". Overriding both variables directly to their plain-day
+   equivalents removes that residual instead of just chasing it further
+   down the derivation chain. */
+#view-box {
+  --viewTodayBackground: var(--viewBackground) !important;
+  --viewTodayOffBackground: var(--viewOffTimeBackground) !important;
+}
+
+/* Defensive completion of the "no special today background, ever" rule:
+   if today itself falls on a weekend, the today+weekend combo reads a
+   THIRD, still-untouched variable (--viewTodayWeekendBackground,
+   calendar-views.css: `.day-column-today.day-column-weekend:not(.day-
+   column-selected)`), independent of the two above. Today, 29 Jul 2026,
+   is a Wednesday so this has no visible effect right now, but without it
+   a future today-on-a-Saturday would still show an extra blended tint on
+   top of the normal weekend background. Resolving to the plain weekend
+   variable makes a today-weekend column look like any other weekend day
+   — no separate "today" treatment, matching the weekday case above. */
+#view-box {
+  --viewTodayWeekendBackground: var(--viewWeekendBackground) !important;
+}
+
+/* ---- Selected day column: border only, no background wash, no header color change ---- */
+/* User feedback round 10, three bugs found in round 9's attempt
+   (09_calendar_10.png):
+
+   1. Header text turned green for the selected day too, not just today.
+      Native cause: `.day-column-heading { .day-column-today &,
+      .day-column-selected & { color: var(--selected-item-color);
+      font-weight: bold } }` (calendar-views.css) colors BOTH states from
+      one rule. Scoped a plain-white override to
+      .day-column-selected:not(.day-column-today) so selection alone
+      never recolors the header — only "today" does.
+
+   2. Column read as one flat, undifferentiated slab with no hour
+      gridlines ("solid black... overrides cell borders"). Root cause:
+      round 9's neutralization used `border-color: transparent` (all four
+      sides) on .multiday-hour-box to kill the native inline highlight
+      line — but that also wiped its normal block-start/block-end
+      hour-separator border (--viewBorderColor/--border-hair), which has
+      nothing to do with selection. Narrowed to `border-inline-color`
+      only, leaving the horizontal gridlines alone.
+
+   3. Background read as a solid dark fill despite round 9's
+      --viewDayBoxSelectedBackground/--viewDayBoxOffSelectedBackground
+      variable remap — round 10 switched to a blanket
+      `background-color: transparent !important` on every painted element,
+      which turned out to have its own bug (see round 11 below).
+
+   Round 10 also introduced `.day-column-selected { border-inline: 2px
+   solid var(--accent) }`, reasoning that .day-column-selected is applied
+   directly to the <article> wrapping the heading/header/hourly-grid
+   children — true, but that border rule had no visible effect at all: see
+   the round 11 note below for why. */
+.day-column-selected:not(.day-column-today) .day-column-heading {
+  color: var(--text-strong) !important;
+  font-weight: 700 !important;
+}
+
+/* Round 11 root cause for "no border at all shows up, in any round":
+   .day-column-container (= .day-column-selected) is native
+   `display: contents` (calendar-views.css: "Container children become
+   grid items") — it never generates its own paintable box, so EVERY
+   border/background rule targeted directly at .day-column-selected in
+   rounds 8-10 was silently inert, no matter the property used. The three
+   real children — .day-column-heading, calendar-header-container,
+   calendar-event-column — are what actually paint; putting the border on
+   each of those instead, stacked at the same horizontal position, reads
+   as one continuous edge down the whole day. calendar-event-column
+   already wraps the full hourly grid as one box (confirmed via its own
+   native border-inline-start, calendar-views.css ~line 505), so this
+   only needs 3 rules, not one per hour cell.
+
+   Round 11 background bug: round 10's blanket
+   `background-color: transparent` also wiped the WEEKEND tint and the
+   weekend-off-hours tint for a selected weekend day (confirmed live,
+   09_calendar_11_visual_marks.png, marks 1/2) — those come from
+   different variables entirely (--viewWeekendBackground/
+   --viewMonthDayOffLabelBackground), unrelated to selection. Re-declaring
+   --viewDayBoxSelectedBackground/--viewDayBoxOffSelectedBackground scoped
+   two ways (plain vs. .day-column-weekend) instead of one blanket value
+   keeps the underlying weekend/weekday distinction intact while still
+   removing selection's own extra tint on top of it — same
+   variable-override pattern as --viewTodayBackground above. */
+.day-column-selected {
+  --viewDayBoxSelectedBackground: var(--viewBackground) !important;
+  --viewDayBoxOffSelectedBackground: var(--viewOffTimeBackground) !important;
+}
+
+.day-column-selected.day-column-weekend {
+  --viewDayBoxSelectedBackground: var(--viewWeekendBackground) !important;
+  --viewDayBoxOffSelectedBackground: var(--viewMonthDayOffLabelBackground) !important;
+}
+
+/* Neutralize the native per-cell highlight border on every hour box
+   (70%-opacity mix, calendar-views.css) so it doesn't double up against
+   the solid accent border now drawn once on calendar-event-column below. */
+.multiday-grid:not(.multiday-grid-rotated) .day-column-selected .multiday-hour-box,
+.multiday-grid.multiday-grid-rotated .day-column-selected .multiday-hour-box {
+  border-inline-color: transparent !important;
+}
+
+.day-column-selected .day-column-heading,
+.day-column-selected calendar-header-container,
+.day-column-selected calendar-event-column {
+  border-inline: 1px solid var(--accent) !important;
+}
+
+/* ---- Right-side "Tasks" pane (Today Pane shown in Calendar mode) ---- */
+/* Per user decision: keep the real Tasks pane as-is (no fabricated "Up
+   next" agenda). No new selectors needed here — confirmed from source
+   this is the *same* #today-pane-panel/#todo-tab-panel component already
+   built out in today-pane.css (header #today-pane-header/cyclers/closer,
+   #show-completed-checkbox-box, .calendar-task-tree and its rows/checkbox/
+   completed-state) for the Mail-view region. Calendar mode just shows a
+   different pane state of that same, already-styled component — nothing
+   calendar-specific to add here. One unconfirmed detail: the "Click here
+   to add a new task" empty-state hint's exact id wasn't findable in the
+   extracted source (likely fluent-generated placeholder row content) —
+   left unstyled rather than guessing a selector; check it live and file a
+   follow-up if it still looks native after restart. */
+
+/* ---- Now-indicator ---- */
+/* Both the grid line and the gutter ring hardcode --color-red-50 (Photon
+   red, confirmed in calendar-views.css) rather than a token — swap to
+   --now-line (#f0817a, already defined in tokens.css for this exact
+   purpose). Line and ring are separate elements/rules, both need it. */
+.timeIndicator {
+  border-color: var(--now-line) !important;
+  opacity: 1 !important;
+}
+
+/* User feedback round 6: the dot lives in the separate timebar/gutter
+   column (aligned with the hour labels), structurally disconnected from
+   .timeIndicator (the actual line, inside today's day column) — confirmed
+   via crop, they render nowhere near each other. Rather than fight that
+   structural gap (the gutter element's position is set in JS relative to
+   its own column, not the day column), hide it and generate a dot
+   directly on .timeIndicator instead, self-contained within the day
+   column and guaranteed attached to the line. */
+.multiday-timebar-now-indicator {
+  display: none !important;
+}
+
+.timeIndicator {
+  position: relative;
+}
+
+/* User feedback round 7: manual -4px/-4px offsets weren't actually
+   centered on the line. transform: translate(-50%, -50%) anchored at the
+   line's own start point (inset-inline-start:0, top:0) centers the dot
+   exactly regardless of its size, instead of guessing an offset. */
+.timeIndicator::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background-color: var(--now-line);
+}
+
+/* User feedback round 4: the line read too faint against the mock's
+   clearly-visible solid one — .timeIndicator's native `opacity: 0.7`
+   (calendar-views.css) was dimming it below the color fix's effect;
+   bumped to full opacity above. */
+
+/* ---- Calendar list (#calendar-list) selected/hover row ---- */
+/* Confirmed from calendar-widgets.css: unfocused .selected only gets a
+   neutral color-mix(currentColor 10%) tint — the accent-colored version
+   only applied via :root-scoped --selected-item-color when the list has
+   *focus*. Overriding .selected unconditionally instead, same
+   accent-soft + left-bar pattern already established for folder-pane's
+   selected row, so calendar list selection reads consistently regardless
+   of focus state. */
+#calendar-list > li {
+  position: relative;
+}
+
+#calendar-list > li.selected,
+#calendar-list:focus-within > li.selected {
+  background-color: var(--accent-soft) !important;
+}
+
+#calendar-list > li.selected::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: var(--radius-sm);
+  background-color: var(--accent);
+}
+
+/* ---- Calendar list: color dots, ENABLE pill ---- */
+/* Confirmed from source: .calendar-color is a plain color-swatch dot (real
+   per-calendar color via inline style, same "preserve real user data"
+   pattern as folder-pane/message-list/today-pane's colored bars) — the
+   *actual* visibility checkbox is .calendar-displayed, styled invisible
+   until hover (opacity:0 when checked, hidden/eye icon swap) rather than a
+   persistent colored checkbox like the mock shows. Not fighting that
+   interaction model per the plan (real functionality > mock shape) — just
+   sizing the dot up a bit (9px default reads small against a ~16px target)
+   and toning the ENABLE pill's hardcoded blue to the theme's palette. */
+#calendar-list {
+  --calendar-list-item-dot-size: 16px !important;
+}
+
+/* User feedback round 3: shape should be a rectangle (checkbox-like, per
+   the reference mock's rounded-square calendar checkboxes), not a circle
+   — calendar-widgets.css hardcodes `border-radius: 5px` on .calendar-color
+   directly (not read from a custom property, so it needs its own
+   override). Also bumped .calendar-name's font-size — it inherits the
+   sidebar's small default rather than reading as clearly as the mock. */
+.calendar-color {
+  border-radius: 4px !important;
+}
+
+.calendar-name {
+  font-size: 14px !important;
+}
+
+#calendar-list > li > button.calendar-enable-button {
+  color: var(--text-strong) !important;
+  background: var(--surface-hover) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+#calendar-list > li > button.calendar-enable-button:is(:hover, :focus, :active) {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
+/* ---- Main toolbar (#calendarViewHeader) ---- */
+#calendarViewHeader {
+  background-color: var(--bg-titlebar) !important;
+  border-block-end: 1px solid var(--border-hair) !important;
+}
+
+/* User feedback round 4: reference mock's date title is noticeably larger
+   and bolder than round 1's 15px pass. */
+#intervalDescription {
+  color: var(--text-strong) !important;
+  font-size: 19px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.2px;
+}
+
+/* "CW: 31" — real functional label, not in the mock; muted rather than
+   removed, same "keep real functionality" precedent as today-pane/
+   status-bar's own non-mock text. */
+#calendarWeek {
+  color: var(--text-faint) !important;
+  font-weight: 400 !important;
+}
+
+#previousViewButton,
+#todayViewButton,
+#nextViewButton,
+#calendarControlBarMenu {
+  color: var(--text-muted) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* User feedback rounds 2/4/5: rebuilt from scratch against the reference
+   crop (screenshots/02-calendar.png) rather than iterating further —
+   mock order is Today (its own bordered/backed pill, WITH a visible
+   "Today" text label) → gap → prev/next (fully plain: no border, no
+   background at all, just a muted glyph) → gap → bold date title. Real
+   TB fuses all three into one native .button-group with no DOM seam
+   (confirmed in messenger.xhtml) — can't split the group itself, but each
+   button's own background/border can still be styled independently once
+   the group's shared chrome is stripped. */
+#calendarControls .button-group {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+/* Plain, no background/border at all — only a hover affordance. User
+   feedback round 7: previousViewButton was still showing a border — the
+   .button-group's own border:none (above) doesn't reach the individual
+   buttons' own border-color from the base .button class; needs its own
+   explicit removal here. */
+#previousViewButton,
+#nextViewButton {
+  background-color: transparent !important;
+  border: none !important;
+}
+
+#previousViewButton:hover,
+#nextViewButton:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+/* Today: its own bordered pill, separated from the arrows with margin.
+   #todayViewButton is icon-only in real TB (data-l10n-id only supplies a
+   tooltip, no visible label — confirmed in messenger.xhtml, no label/span
+   in its markup) — the mock's "Today" text has no real element to read
+   from, so it's generated content. This is a deliberate, English-only
+   cosmetic label (won't follow the app's actual locale) — a known,
+   accepted trade-off for matching the mock's visual intent here, unlike
+   this project's usual "keep real functionality, don't fake mock text"
+   rule elsewhere, since there's no real text to preserve in the first
+   place (the button has none). Hides the native calendar-icon background
+   image so the generated text is the only visible content, same as the
+   mock.
+
+   User feedback round 6, two more fixes: (1) order still didn't match —
+   native DOM order is prev/today/next (today sandwiched between the
+   arrows), but the mock wants Today *first*. #calendarControls is
+   display:flex, so `order` reorders visually without touching the DOM,
+   same technique already used elsewhere in this theme (message-list,
+   reading-pane). (2) still too narrow to fit "Today" (showed "To…"
+   truncated) even with inline-size:auto/padding-inline set — root cause:
+   `.icon-only` sets `aspect-ratio: 1` (widgets.css), which locks width to
+   match the fixed height regardless of content or padding. Releasing it
+   is what actually lets the button grow to fit the label. */
+/* User feedback round 7: border only, no separate background fill. */
+#todayViewButton {
+  order: -1 !important;
+  aspect-ratio: auto !important;
+  margin-inline: 6px !important;
+  min-inline-size: unset !important;
+  inline-size: auto !important;
+  padding-inline: 14px !important;
+  border: 1px solid var(--border-line) !important;
+  border-radius: var(--radius-md) !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--text-primary) !important;
+}
+
+#todayViewButton::after {
+  content: "Today";
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#todayViewButton:hover {
+  background-color: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+
+/* Segmented Day/Week/Multiweek/Month control. Confirmed from source:
+   --calendar-view-toggle-selected-background is just var(--layout-
+   background-1) (a plain neutral, not an accent token) — that's the
+   light-gray pill seen live behind "Week". Overriding the two variables
+   the active/hover states already read from, rather than fighting
+   .calview-toggle-item's own background-color declarations directly. */
+.calview-toggle {
+  --calendar-view-toggle-selected-background: var(--accent) !important;
+  --calendar-view-toggle-selected-hover-background: var(--accent) !important;
+  --calendar-view-toggle-background: transparent !important;
+  --calendar-view-toggle-hover-background: var(--surface-hover) !important;
+  --calendar-view-toggle-border-color: var(--border-hair) !important;
+}
+
+button.calview-toggle-item[role="tab"][aria-selected="true"] {
+  color: var(--accent-ink) !important;
+  font-weight: 600 !important;
+}
+
+/* User feedback round 4: rectangle, not a pill — .calview-toggle/
+   .calview-toggle-item both hardcode border-radius: 1000px directly in
+   calendar-views.css (not read from a variable), so this needs its own
+   direct override to match the theme's --radius-md language used
+   elsewhere (folder-pane rows, event-dialog buttons, etc). */
+.calview-toggle,
+button.calview-toggle-item {
+  border-radius: var(--radius-md) !important;
+}
+
+/* Current-week row tint: NOT actually a dead end — see
+   `.minimonth-row-body:has(...)` in the mini-month section above. First
+   pass (round 1) concluded there was no DOM hook for "current week" since
+   there's no attribute at the <tr> level; that reasoning missed that
+   :has() lets a *relational* selector reach the row from a per-day
+   attribute on its descendant, no dedicated week-level marker needed.
+   Corrected in round 3 — README "Deviations" updated to match. */

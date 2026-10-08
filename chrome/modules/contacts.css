@@ -1,0 +1,312 @@
+/* Contacts (Address Book) — plan §5.10, second scope-addition item. No
+   reference mock in either prototype — change list reviewed with the user
+   before implementing, same document-then-review pattern as tabs-toolbar/
+   the event dialog. Scope for this round: the view-contact pane only
+   (sidebar, contact list, detail view) — the edit-contact vCard form is a
+   separate surface with no screenshot to verify against yet, deferred to a
+   later round per user direction.
+
+   Structural finding from source (aboutAddressBook.xhtml, addressBookTab.js):
+   about:addressbook loads into a `type="content"` <browser> — confirmed
+   `addressBookTabType.openTab()` clones the *same* wrapper element used for
+   about:preferences (Settings), both are "content tabs", not chrome. Same
+   mechanism as the reading pane's #messagepane, so this lives in
+   userContent.css via @-moz-document, not userChrome.css/a module import
+   there.
+
+   Real bug found and fixed, not just styled: the detail pane's section
+   cards (Email Addresses, Other Information, etc.) were collapsing to
+   ~235px regardless of window width, confirmed live even maximized
+   (11_contact_card_03.png) — see the width-collapse block below for the
+   fix and what's still unconfirmed about its root cause. */
+
+@-moz-document url("about:addressbook") {
+
+  /* ---- Base ---- */
+  body {
+    background-color: var(--bg-app) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-ui) !important;
+  }
+
+  /* This document is also reached by userContent.css's existing, deliberately
+     unscoped reading-pane rules (html,body max-width/margin — written for
+     arbitrary message bodies, flagged back then as "risk: bleeding into
+     other in-content pages" and never actually verified). Cancel that leak
+     here explicitly rather than retrofitting scoping onto the message-body
+     rules, which are high-risk to touch (9 rounds to get right). */
+  html, body {
+    max-width: none !important;
+    margin-inline-start: 0 !important;
+    margin-inline-end: 0 !important;
+  }
+
+  /* ---- Width-collapse bug ----
+     Native caps `.contact-details-scroll > *` at `max-inline-size: 64em`
+     and `#detailsBody`'s masonry grid columns at `minmax(31.5em, 1fr)`,
+     both em-relative (comment in source: "Fits two #detailsBody and
+     vcard-edit columns" — intentionally ~2 cards wide, not a narrow single
+     column). Measured live at ~235px actual, in a maximized window — far
+     narrower than either em value should produce even accounting for the
+     leak above, so the leak is a plausible contributor but doesn't fully
+     account for the collapse arithmetically; exact mechanism not resolved
+     from source alone. Fixed pragmatically with fixed px caps instead of
+     chasing the em chain further — these aren't subject to whatever's
+     collapsing the em basis, so they should hold regardless of the precise
+     cause. First-pass, needs live confirmation; if still wrong next round,
+     this needs a live Browser Toolbox computed-style check on
+     `#detailsBody`, not a third blind guess. */
+  .contact-details-scroll > *,
+  #detailsFooter {
+    max-inline-size: 900px !important;
+  }
+
+  #detailsBody {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)) !important;
+  }
+
+  /* ---- Sidebar (#booksPane) ---- */
+  #booksPane {
+    background-color: var(--bg-folders) !important;
+    color: var(--text-second) !important;
+  }
+
+  #booksPaneHeaderBar {
+    padding: 10px !important;
+    gap: 8px !important;
+    border-block-end: 1px solid var(--border-hair) !important;
+  }
+
+  #booksPaneCreateBook,
+  #booksPaneCreateList,
+  #booksPaneImport {
+    background-color: transparent !important;
+    color: var(--text-muted) !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  #booksPaneCreateBook:hover,
+  #booksPaneCreateList:hover,
+  #booksPaneImport:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  #cardCount {
+    color: var(--text-faint) !important;
+    font-size: 11.5px !important;
+  }
+
+  /* "New Contact" — recolored from native blue. Same recurring
+     --selected-item-color (OS AccentColor) leak already fixed in
+     event-dialog/today-pane/calendar/reminder-dialog/tabs-toolbar (this
+     project's running count) — scoped at :root here since this is its own
+     isolated document, not the shared main-window :root calendar.css had
+     to work around. Belt-and-suspenders direct override too, since the
+     indirection has failed to resolve live before without explanation
+     (calendar.css's #sidePanelNewEvent writeup). */
+  :root {
+    --selected-item-color: var(--accent) !important;
+    --selected-item-text-color: var(--accent-ink) !important;
+  }
+
+  #booksPaneCreateContact {
+    background-color: var(--accent) !important;
+    color: var(--accent-ink) !important;
+    border-color: transparent !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+  }
+
+  #booksPaneCreateContact:hover {
+    filter: brightness(1.08);
+  }
+
+  /* Address-book/list rows — same shared list-container.css component the
+     folder pane uses (confirmed: identical li > .container structure),
+     same direct-override pattern bypassing the --selected-item-color
+     indirection rather than debugging why it doesn't always resolve. */
+  #books .container {
+    border-radius: var(--radius-md) !important;
+    margin-inline: 6px !important;
+  }
+
+  #books li:not(.selected) > .container:hover {
+    background-color: var(--surface-hover-soft) !important;
+    border-color: transparent !important;
+  }
+
+  #books li.selected > .container,
+  #books li.selected > .container:hover {
+    background-color: var(--accent-soft) !important;
+    border-color: transparent !important;
+  }
+
+  #books li.selected > .container::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 4px;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: var(--radius-sm);
+    background-color: var(--accent);
+  }
+
+  .bookRow-name,
+  .listRow-name {
+    color: var(--text-second) !important;
+  }
+
+  #books li.selected .bookRow-name,
+  #books li.selected .listRow-name {
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+  }
+
+  /* ---- Cards pane (contact list, middle) ---- */
+  #cardsPane {
+    background-color: var(--bg-list) !important;
+  }
+
+  #cardsPaneHeader {
+    padding: 10px !important;
+  }
+
+  search-bar#searchInput {
+    --search-bar-background: var(--surface-card) !important;
+    --search-bar-color: var(--text-primary) !important;
+    --search-bar-border-color: var(--border-line) !important;
+  }
+
+  #displayButton {
+    color: var(--text-muted) !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  #displayButton:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  #cards {
+    border-block-start-color: var(--border-hair) !important;
+  }
+
+  /* Contact rows — reuse message-list's card-row selection language
+     (hover wash, accent-soft selected, no left-bar here since rows are
+     already dense/compact, matching the sidebar's own list rows above
+     rather than message-list's thicker cards). */
+  tr[is="ab-card-row"] {
+    color: var(--text-second) !important;
+  }
+
+  tr[is="ab-card-row"]:hover {
+    background-color: var(--surface-hover-soft) !important;
+  }
+
+  tr[is="ab-card-row"].selected {
+    background-color: var(--accent-soft) !important;
+    color: var(--text-strong) !important;
+  }
+
+  tr[is="ab-card-row"] .name {
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+  }
+
+  tr[is="ab-card-row"] .address {
+    color: var(--text-muted) !important;
+  }
+
+  /* contact-avatar is a shadow-DOM custom element (contactAvatar.css)
+     reading plain inherited custom properties, not accent-specific — same
+     technique as reading-pane's .recipient-avatar. Scoped to the element
+     itself so it doesn't affect other consumers of the same tokens
+     elsewhere in this document. Left as a neutral surface tone rather than
+     accent, since accent should read as "selected", not "generic person". */
+  contact-avatar {
+    --color-surface-deep: var(--surface-card) !important;
+    --color-text-base: var(--text-muted) !important;
+  }
+
+  /* ---- Details pane (right, view-contact) ---- */
+  #detailsPane {
+    background-color: var(--bg-titlebar) !important;
+  }
+
+  .contact-photo {
+    background-color: var(--surface-card) !important;
+    stroke: var(--text-muted) !important;
+  }
+
+  .contact-heading-name {
+    color: var(--text-strong) !important;
+    font-weight: 600 !important;
+  }
+
+  .contact-heading-nickname,
+  .contact-heading-email {
+    color: var(--text-muted) !important;
+  }
+
+  /* Action row (Write/Event/Search/New List) — muted icon-button language,
+     matching reading-pane's action toolbar. */
+  #detailsActions .button-flat.icon-button {
+    color: var(--text-muted) !important;
+    background-color: transparent !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  #detailsActions .button-flat.icon-button:hover {
+    background-color: var(--surface-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* Edit — primary action, same accent-pill convention as New Event/New
+     Message/New Contact. */
+  #editButton {
+    background-color: var(--accent) !important;
+    color: var(--accent-ink) !important;
+    border-color: transparent !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+  }
+
+  #editButton:hover {
+    filter: brightness(1.08);
+  }
+
+  /* Section cards (Email Addresses/Phone Numbers/Addresses/Notes/Websites/
+     Instant Messaging/Other Information) — native flat gray boxes reshaped
+     into this theme's card language. */
+  #detailsBody section {
+    background-color: var(--surface-card) !important;
+    border-color: var(--border-hair) !important;
+  }
+
+  #detailsBody h2 {
+    color: var(--text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+  }
+
+  .entry-type {
+    color: var(--text-faint) !important;
+  }
+
+  .entry-value {
+    color: var(--text-second) !important;
+  }
+
+  /* Links (email/website entries) — this is native app UI on our own dark
+     --surface-card background, not arbitrary message content, so --accent
+     directly is correct here (unlike userContent.css's message-body rules,
+     which use the dimmer --link-ink because they can't assume a dark
+     backdrop). */
+  a {
+    color: var(--accent) !important;
+  }
+}

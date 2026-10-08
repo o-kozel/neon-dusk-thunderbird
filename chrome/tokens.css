@@ -1,0 +1,109 @@
+/* ============================================================
+   Thunderbird Dark — design tokens
+   Imported at the top of userChrome.css / userContent.css.
+   Swap the three --accent* vars (and the matching commented block
+   below) to re-theme the whole UI — see README "Accent swap".
+   ============================================================ */
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  src: url("fonts/Inter-4.1/web/InterVariable.woff2") format("woff2-variations");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+  src: url("fonts/Inter-4.1/web/InterVariable-Italic.woff2") format("woff2-variations");
+}
+
+:root {
+  /* --- surfaces (darkest -> lightest) --- */
+  --bg-app:        #0d0e10;
+  --bg-titlebar:   #131417;
+  --bg-rail:       #131417;
+  --bg-reading:    #131417;
+  --bg-folders:    #1a1b1e;
+  --bg-today:      #1a1b1e;
+  --bg-list:       #1c1d21;
+  --surface-card:  #202125;
+  --surface-hover: rgba(255,255,255,.06);
+  --surface-hover-soft: rgba(255,255,255,.045);
+  --row-hover:     rgba(255,255,255,.04);
+  --border-hair:   rgba(255,255,255,.05);
+  --border-line:   rgba(255,255,255,.09);
+
+  /* --- text --- */
+  --text-strong:  #f2f3f5;
+  --text-primary: #e7e8eb;
+  --text-second:  #c9cbd1;
+  --text-muted:   #8a8c93;
+  --text-faint:   #6c6e77;
+  --text-disabled:#4a4c53;
+
+  /* --- accent (default GREEN). Alternatives below. --- */
+  --accent:       #34d399;
+  --accent-soft:  rgba(52,211,153,.14);
+  --accent-ink:   #06231a;   /* text/icon on accent fills */
+  /* Message-body links (userContent.css) can't assume a dark backdrop —
+     the message's own background is whatever the sender set, or white by
+     default, since the theme deliberately never forces one there. --accent
+     itself is tuned for --bg-reading and reads poorly on white (confirmed
+     via 04_reading_pane_21.png). --link-ink is a darker compromise shade:
+     legible on white, still recognizably green on dark. */
+  --link-ink:     #0d8f5f;
+  /* Blue:   #4c8dff / rgba(76,141,255,.15)  / #04122e
+     Purple: #8b5cf6 / rgba(139,92,246,.16)  / #1a0f36
+     Amber:  #f59e0b / rgba(245,158,11,.16)  / #2a1a02 */
+
+  /* --- calendar palette (per calendar) --- */
+  --cal-personal: #34d399;  --cal-personal-bg: rgba(52,211,153,.16);
+  --cal-work:     #5aa9ff;  --cal-work-bg:     rgba(90,169,255,.16);
+  --cal-outlook:  #a78bfa;  --cal-outlook-bg:  rgba(139,92,246,.18);
+  --cal-holiday:  #f0817a;  --cal-holiday-bg:  rgba(240,129,122,.16);
+  --cal-team:     #2dd4bf;  --cal-team-bg:     rgba(45,212,191,.16);
+  --cal-bday:     #f5b942;  --cal-bday-bg:     rgba(245,158,11,.16);
+  --now-line:     #f0817a;
+
+  /* --- tag chips --- */
+  --tag-social:    #7cbaff;  --tag-social-bg:    rgba(90,169,255,.15);
+  --tag-finance:   #f5b942;  --tag-finance-bg:   rgba(245,158,11,.16);
+  --tag-recruiting:#c4b5fd;  --tag-recruiting-bg:rgba(139,92,246,.16);
+  --tag-jobs:      #4fe0ad;  --tag-jobs-bg:      rgba(52,211,153,.14);
+
+  /* --- destructive --- */
+  --danger:       #e0483d;
+  --danger-soft:  rgba(224,72,61,.16);
+  --danger-ink:   #f08a80;
+
+  /* --- misc state --- */
+  --star-active:  #f5c542;  /* reading pane / message list star hover+flagged */
+
+  /* --- geometry --- */
+  --radius-sm:  6px;
+  --radius-md:  8px;
+  --radius-lg:  10px;
+  --radius-xl:  12px;
+  --radius-pill:20px;
+
+  --rail-w:    54px;
+  --folders-w: 238px;
+  --list-w:    400px;
+  --today-w:   250px;
+  --sidebar-w: 250px;
+
+  --cal-hour-h: 52px;   /* week-grid row height per hour */
+  --cal-start-hour: 7;  /* first visible hour */
+
+  /* --- typography --- */
+  --font-ui:   "Inter", system-ui, -apple-system, sans-serif;
+  --fs-body:   13px;
+  --fs-read:   14px;
+  --lh-read:   1.72;
+  --row-pad:   12px 16px;   /* comfortable density; compact = 7px 16px */
+  --avatar-size: 36px;
+}

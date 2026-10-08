@@ -1,0 +1,110 @@
+/* Status bar — plan §5.7. Selectors verified against TB 153.0 source
+   (messenger.xhtml, mailWindow.js, shared/messenger.css, calendar/skin/
+   classic/calendar/{,shared/}calendar.css) — not yet spot-checked live via
+   Browser Toolbox, so treat as a first pass to diff against a restart
+   screenshot, same as every other region.
+
+   Known, deliberate deviations from the reference mock (confirmed from
+   source, not just visually):
+   - #statusText is a generic transient activity-message queue
+     (mailWindow.js showStatusString — "Deleted 1 message from X", sync
+     progress, etc.), not a static "myxi4i@gmail.com: Connected to
+     imap.gmail.com" string. Kept the real functional text rather than
+     faking mock text, same call already made for today-pane's header and
+     date-group headers.
+   - #offline-status renders TB's native online/offline WiFi-style icon
+     (--icon-online/--icon-offline), not the mock's plain accent dot with
+     a soft ring. Recolored the real icon rather than reshaping it into a
+     custom dot — consistent with the same precedent.
+   - Per-account status text (reflecting the currently selected
+     folder/account) is NOT implemented — confirmed from source there's no
+     native data source for this in the status bar at all; would need a JS
+     shim to compute "selected folder's account" and inject it, blocked on
+     this Flatpak install same as today-pane's duration/location/
+     participants and popup-positioning gaps. Logged as deferred backlog,
+     see PROGRESS.md. */
+
+#status-bar {
+  background-color: var(--bg-titlebar) !important;
+  border-block-start: 1px solid var(--border-hair) !important;
+  min-block-size: 34px !important;
+  align-items: center !important;
+}
+
+/* Raising min-block-size above native's default left the wifi icon
+   vertically centered but the status text sitting at the top instead
+   (confirmed live, 07_status_bar_01.png) — #statusTextBox is a nested
+   hbox, so it needs its own align-items; #status-bar's alone doesn't
+   necessarily cascade down through it. */
+#statusTextBox {
+  align-items: center !important;
+}
+
+#statusText,
+#urlText {
+  font-size: 11.5px !important;
+  color: var(--text-faint) !important;
+}
+
+/* Connection icon: both fill and stroke already derive from currentColor
+   in TB's own CSS (color-mix(in srgb, currentColor 20%, transparent) /
+   stroke: currentColor) — chrome://-origin icon, so -moz-context-properties
+   applies normally here (unlike this repo's own SVGs) and just setting
+   `color` is enough to recolor it, no mask-image swap needed. */
+#offline-status {
+  color: var(--accent) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+#offline-status[offline="true"] {
+  color: var(--text-muted) !important;
+}
+
+#offline-status:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+/* Sync progress meter: native <progress> element, recolor the fill. */
+#statusbar-icon.progressmeter-statusbar::-moz-progress-bar {
+  background-color: var(--accent) !important;
+}
+
+/* Today Pane toggle: strip the native hover border (same button-style-
+   border issue already fixed once on the New Event window's toolbar —
+   #calendar-status-todaypane-button has the identical
+   border:1px solid transparent -> hover border-color pattern) and match
+   the muted icon-button treatment used everywhere else in this theme. */
+#calendar-status-todaypane-button {
+  color: var(--text-muted) !important;
+  border-color: transparent !important;
+}
+
+#calendar-status-todaypane-button .toolbarbutton-text {
+  font-size: 12.5px !important;
+}
+
+#calendar-status-todaypane-button:hover {
+  background-color: var(--surface-hover) !important;
+  border-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+/* Swap in this repo's own calendar.svg, matching today-pane's header icon
+   (#today-pane-header::before) rather than TB's native glyph — same
+   mask-image + background-color:currentColor mechanism as every other
+   icon swap in this theme (-moz-context-properties doesn't work on our
+   file://-loaded SVGs). */
+#calendar-status-todaypane-button {
+  list-style-image: none !important;
+}
+
+#calendar-status-todaypane-button .toolbarbutton-icon {
+  content: none !important;
+  mask-repeat: no-repeat !important;
+  mask-position: center !important;
+  mask-size: contain !important;
+  background-color: currentColor !important;
+  mask-image: url("../icons/calendar.svg") !important;
+  inline-size: 16px !important;
+  block-size: 16px !important;
+}
